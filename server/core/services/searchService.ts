@@ -34,12 +34,12 @@ export function isMagnetLink(link: { type?: string; url?: string } | undefined |
  */
 export function isSafeResource(result: SearchResult): boolean {
   const text = `${result.title || ""} ${result.content || ""}`;
-  // 拦截木马与恶意伪装后缀（如 .exe, .scr, .bat, .apk, .vbs）
-  if (/\.(exe|scr|bat|apk|vbs|cmd|com|pif)(\.|\s|$)/i.test(text)) {
+  // 拦截木马与恶意伪装后缀（如 .exe, .scr, .bat, .apk, .vbs, .msi, .lnk, .jar, .cmd）
+  if (/\.(exe|scr|bat|apk|vbs|cmd|com|pif|msi|lnk|jar)(\.|\s|$)/i.test(text)) {
     return false;
   }
-  // 拦截常见博彩诈骗垃圾词
-  if (/(澳门新葡京|现金棋牌|官方直营|真人荷官|色情直播|六合彩)/i.test(text)) {
+  // 拦截常见博彩诈骗与诱导加群解压密码等垃圾词
+  if (/(澳门新葡京|现金棋牌|官方直营|真人荷官|色情直播|六合彩|加微信获取解压密码|解压密码联系)/i.test(text)) {
     return false;
   }
   return true;

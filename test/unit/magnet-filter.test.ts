@@ -188,7 +188,10 @@ describe("搜索结果融合磁力链接与安全防护", () => {
     // 单独校验 isSafeResource 规则
     expect(isSafeResource({ title: "大片.mp4.exe", links: [] } as any)).toBe(false);
     expect(isSafeResource({ title: "播放器.scr", links: [] } as any)).toBe(false);
+    expect(isSafeResource({ title: "补丁.msi", links: [] } as any)).toBe(false);
+    expect(isSafeResource({ title: "快捷方式.lnk", links: [] } as any)).toBe(false);
     expect(isSafeResource({ title: "澳门新葡京官方直营", links: [] } as any)).toBe(false);
+    expect(isSafeResource({ title: "精彩视频", content: "加微信获取解压密码", links: [] } as any)).toBe(false);
     expect(isSafeResource({ title: "Interstellar.2014.1080p.mkv", links: [] } as any)).toBe(true);
   });
 });

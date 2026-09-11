@@ -29,6 +29,8 @@ import { DyyjvPlugin } from "../plugins/dyyjv";
 import { YtsPlugin } from "../plugins/yts";
 import { DmhyPlugin } from "../plugins/dmhy";
 import { SolidTorrentsPlugin } from "../plugins/solidtorrents";
+import { ApiBayPlugin } from "../plugins/apibay";
+import { MikanPlugin } from "../plugins/mikan";
 
 const SERVICE_CONTEXT_KEY = "__panhub_search_service__";
 
@@ -70,6 +72,8 @@ function createPluginManager(): PluginManager {
   safeRegister("yts", () => new YtsPlugin());
   safeRegister("dmhy", () => new DmhyPlugin());
   safeRegister("solidtorrents", () => new SolidTorrentsPlugin());
+  safeRegister("apibay", () => new ApiBayPlugin());
+  safeRegister("mikan", () => new MikanPlugin());
   pm.registerAllGlobalPlugins();
   return pm;
 }
