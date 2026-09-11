@@ -152,7 +152,7 @@
             class="movie-card"
             data-theme-part="movie-card"
             :aria-label="`搜索 ${item.title} 网盘资源`"
-            @click="onFilmClick(item.title)">
+            @click="onFilmClick(item.title, item.id)">
             <div class="card-cover">
               <img
                 v-if="item.cover && !imgFailed.includes(item.id)"
@@ -212,7 +212,7 @@ import type { DoubanExploreItem } from "~/server/core/services/doubanExploreServ
 import { getDynamicYearRanges } from "~/composables/useResourceParser";
 
 interface Props {
-  onSearch: (term: string) => void;
+  onSearch: (term: string, doubanId?: string) => void;
 }
 
 const props = defineProps<Props>();
@@ -405,9 +405,9 @@ function setupObserver() {
   loadObserver.observe(loadTriggerRef.value);
 }
 
-function onFilmClick(title: string) {
+function onFilmClick(title: string, doubanId?: string) {
   if (!title) return;
-  props.onSearch(title.trim());
+  props.onSearch(title.trim(), doubanId);
 }
 
 async function init() {

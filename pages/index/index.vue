@@ -80,70 +80,84 @@
       </div>
     </div>
 
-    <!-- 多维资源筛选栏 -->
-    <SearchFilterBar
-      v-if="hasResults"
-      v-model="filterState"
-      :total-count="searchState.total"
-      :filtered-count="totalFilteredCount"
-      :platform-list="platformList"
-      :resolution-counts="resolutionCounts"
-      :type-counts="typeCounts"
-      :year-counts="yearCounts"
-      :special-quality-counts="specialQualityCounts"
-      @reset="resetFilterState" />
+    <!-- 左右协同工作区 (范式 A: 7:3 协同视口 + 移动端自适应下沉) -->
+    <div v-if="searched || hasResults" class="search-workspace-layout">
+      <!-- 左侧主工作区 (70%): 多维规格筛选与片源结果列表 -->
+      <main class="workspace-main">
+        <!-- 多维资源筛选栏 -->
+        <SearchFilterBar
+          v-if="hasResults"
+          v-model="filterState"
+          :total-count="searchState.total"
+          :filtered-count="totalFilteredCount"
+          :platform-list="platformList"
+          :resolution-counts="resolutionCounts"
+          :type-counts="typeCounts"
+          :year-counts="yearCounts"
+          :special-quality-counts="specialQualityCounts"
+          @reset="resetFilterState" />
 
-    <!-- 搜索结果 -->
-    <section v-if="hasResults" class="results-section">
-      <div v-if="groupedResults.length > 0" class="results-grid">
-        <ResultGroup
-          v-for="group in groupedResults"
-          :key="group.type"
-          :title="platformName(group.type)"
-          :color="platformColor(group.type)"
-          :icon="platformIcon(group.type)"
-          :items="group.items"
-          :expanded="filterState.platform !== 'all' || isExpanded(group.type)"
-          :initial-visible="initialVisible"
-          :can-toggle-collapse="false"
-          @toggle="handleToggle(group.type)"
-          @copy="copyLink" />
-      </div>
-      <div v-else class="filter-empty-card">
-        <p class="filter-empty-text">
-          🔍 未找到符合当前组合筛选条件的资源，请尝试切换筛选标签或
-          <button class="filter-reset-link" @click="resetFilterState">重置筛选</button>
-        </p>
-      </div>
-    </section>
+        <!-- 搜索结果 -->
+        <section v-if="hasResults" class="results-section">
+          <div v-if="groupedResults.length > 0" class="results-grid">
+            <ResultGroup
+              v-for="group in groupedResults"
+              :key="group.type"
+              :title="platformName(group.type)"
+              :color="platformColor(group.type)"
+              :icon="platformIcon(group.type)"
+              :items="group.items"
+              :expanded="filterState.platform !== 'all' || isExpanded(group.type)"
+              :initial-visible="initialVisible"
+              :can-toggle-collapse="false"
+              @toggle="handleToggle(group.type)"
+              @copy="copyLink" />
+          </div>
+          <div v-else class="filter-empty-card">
+            <p class="filter-empty-text">
+              🔍 未找到符合当前组合筛选条件的资源，请尝试切换筛选标签或
+              <button class="filter-reset-link" @click="resetFilterState">重置筛选</button>
+            </p>
+          </div>
+        </section>
 
-    <!-- 空状态：仅当搜索完全结束且无结果时显示，搜索进行中不显示 -->
-    <section v-else-if="searched && !searchState.loading && !searchState.deepLoading && !searchState.paused" class="empty-state">
-      <div class="empty-card">
-        <div class="empty-card__main">
-          <div class="empty-icon" aria-hidden="true">
-            <svg
-              width="44"
-              height="44"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-              <path d="m8.5 8.5 5 5" />
-              <path d="m13.5 8.5-5 5" />
-            </svg>
+        <!-- 空状态：仅当搜索完全结束且无结果时显示，搜索进行中不显示 -->
+        <section v-else-if="searched && !searchState.loading && !searchState.deepLoading && !searchState.paused" class="empty-state">
+          <div class="empty-card">
+            <div class="empty-card__main">
+              <div class="empty-icon" aria-hidden="true">
+                <svg
+                  width="44"
+                  height="44"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                  <path d="m8.5 8.5 5 5" />
+                  <path d="m13.5 8.5-5 5" />
+                </svg>
+              </div>
+              <div class="empty-card__text">
+                <h3>未找到相关资源</h3>
+                <p>试试其他关键词，或在右侧查看是否有相关中文字幕</p>
+              </div>
+            </div>
           </div>
-          <div class="empty-card__text">
-            <h3>未找到相关资源</h3>
-            <p>试试其他关键词，或稍后再试</p>
-          </div>
-        </div>
-      </div>
-    </section>
+        </section>
+      </main>
+
+      <!-- 右侧配套侧栏 (30%): SubHD 字幕关联展示面板 -->
+      <aside class="workspace-sidebar">
+        <SubtitleSidebar
+          :keyword="kw"
+          :douban-id="currentDoubanId"
+          :is-searching="searchState.loading || searchState.deepLoading" />
+      </aside>
+    </div>
 
     <!-- 错误提示 -->
     <section v-if="searchState.error" class="error-alert">
@@ -180,8 +194,10 @@ const siteUrl = (config.public?.siteUrl as string) || "";
 const route = useRoute();
 const router = useRouter();
 
-// 影视片库探索组件引用
+// 影视片库探索组件引用与 SubHD 字幕关联 ID
 const filmExploreRef = ref<InstanceType<typeof FilmExploreSection> | null>(null);
+const currentDoubanId = ref<string>("");
+const lastDoubanKw = ref<string>("");
 
 // 页面加载时初始化影视探索数据
 onMounted(async () => {
@@ -328,6 +344,10 @@ async function handleAuthRequired() {
 // 搜索执行
 async function onSearch() {
   if (!kw.value) return;
+  // 若用户手动输入了新关键词（与上次点击的海报片名不匹配），则清空精准豆瓣关联 ID
+  if (kw.value !== lastDoubanKw.value) {
+    currentDoubanId.value = "";
+  }
   // 暂停状态下发起新搜索：放弃旧任务重新开始（想继续旧搜索请点"继续"按钮）
   if (searchState.value.paused) {
     resetSearch();
@@ -341,9 +361,11 @@ async function onSearch() {
   await doSearch();
 }
 
-// 快速搜索
-async function quickSearch(keyword: string) {
+// 快速搜索（支持海报点击透传豆瓣 ID 联动 SubHD）
+async function quickSearch(keyword: string, doubanId?: string) {
   kw.value = keyword;
+  currentDoubanId.value = doubanId || "";
+  lastDoubanKw.value = keyword;
   await onSearch();
 }
 
@@ -361,6 +383,8 @@ async function handleContinueSearch() {
 async function fullReset() {
   // 清空输入框和重置状态
   kw.value = "";
+  currentDoubanId.value = "";
+  lastDoubanKw.value = "";
   resetFilterState();
   expandedSet.value = new Set();
   resetSearch();
@@ -804,6 +828,40 @@ function visibleItems(type: string, items: any[]) {
   color: white;
   border-color: transparent;
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.28);
+}
+
+/* 左右 7:3 协同工作区布局 (范式 A: Master-Detail 宽屏 + 移动端自适应下沉) */
+.search-workspace-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+  animation: fadeIn 0.4s ease;
+}
+
+.workspace-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.workspace-sidebar {
+  min-width: 0;
+  position: sticky;
+  top: 80px;
+}
+
+@media (max-width: 1024px) {
+  .search-workspace-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .workspace-sidebar {
+    position: static;
+  }
 }
 
 /* 搜索结果区域 */
