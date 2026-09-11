@@ -60,6 +60,11 @@
                 提取码: {{ r.password }}
               </span>
 
+              <!-- 磁力专属高亮标签 -->
+              <span v-if="isMagnet(r)" class="meta-tag badge-magnet">
+                🧲 磁力直连
+              </span>
+
               <!-- 智能特征标签 -->
               <span v-if="getMeta(r).size" class="meta-tag badge-size">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -112,20 +117,34 @@
               </span>
             </div>
 
-            <button
-              class="copy-btn"
-              :class="{ 'copy-btn--copied': copiedUrl === r.url }"
-              @click.prevent="handleCopy(r.url)"
-              :title="copiedUrl === r.url ? '已复制' : (isMagnet(r) ? '复制磁力链接' : '复制链接')">
-              <svg v-if="copiedUrl !== r.url" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-              {{ copiedUrl === r.url ? '已复制' : (isMagnet(r) ? '复制磁力' : '复制') }}
-            </button>
+            <div class="action-buttons">
+              <button
+                class="nas-push-btn"
+                @click.prevent="$emit('push-nas', r)"
+                title="推送到 NAS 离线下载 (支持 AList / Aria2 / qBittorrent)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>推送 NAS</span>
+              </button>
+
+              <button
+                class="copy-btn"
+                :class="{ 'copy-btn--copied': copiedUrl === r.url }"
+                @click.prevent="handleCopy(r.url)"
+                :title="copiedUrl === r.url ? '已复制' : (isMagnet(r) ? '复制磁力链接' : '复制链接')">
+                <svg v-if="copiedUrl !== r.url" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                {{ copiedUrl === r.url ? '已复制' : (isMagnet(r) ? '复制磁力' : '复制') }}
+              </button>
+            </div>
           </div>
         </div>
       </li>
@@ -155,7 +174,7 @@ const props = defineProps<{
   initialVisible: number;
   canToggleCollapse?: boolean;
 }>();
-const emit = defineEmits(["toggle", "copy"]);
+const emit = defineEmits(["toggle", "copy", "push-nas"]);
 
 const copiedUrl = ref("");
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -482,6 +501,15 @@ function formatMediaType(type: string) {
   color: #f59e0b;
 }
 
+/* 磁力专属高亮标签 */
+.meta-tag.badge-magnet {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.35);
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.12);
+}
+
 /* 智能特征规格标签 */
 .meta-tag.badge-res {
   font-weight: 700;
@@ -557,6 +585,45 @@ function formatMediaType(type: string) {
   text-decoration-color: #ef4444;
   text-decoration-thickness: 1.5px;
   opacity: 0.6;
+}
+
+/* 操作按钮容器 */
+.action-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 推送到 NAS 按钮 */
+.nas-push-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius-md);
+  color: #10b981;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.nas-push-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #34d399;
+  transform: translateY(-1px);
+}
+
+.nas-push-btn:active {
+  transform: translateY(0);
+}
+
+.nas-push-btn svg {
+  stroke: currentColor;
 }
 
 /* 复制按钮 */

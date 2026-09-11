@@ -1,5 +1,20 @@
 <template>
   <div class="home">
+    <!-- 智能紧凑吸顶搜索与筛选胶囊 (Smart Compact Sticky Bar) -->
+    <CompactStickyBar
+      :active="isStickyActive"
+      :kw="kw"
+      :loading="searchState.loading"
+      :searched="searched"
+      :total-filtered-count="totalFilteredCount"
+      :search-state-total="searchState.total"
+      :platform-list="platformList"
+      :current-platform="filterState.platform"
+      @update:kw="kw = $event"
+      @update:platform="onPlatformChange"
+      @search="onSearch"
+      @scroll-to-anchor="scrollToAnchor" />
+
     <!-- 英雄区域 + 热门搜索 -->
     <div class="hero-row">
       <div class="hero-noise" aria-hidden="true" />
@@ -64,16 +79,16 @@
         <!-- 平台过滤器 -->
         <div class="platform-filters" v-if="hasResults">
           <button
-            :class="['filter-pill', { active: filterPlatform === 'all' }]"
-            @click="filterPlatform = 'all'">
+            :class="['filter-pill', { active: filterState.platform === 'all' }]"
+            @click="onPlatformChange('all')">
             全部 ({{ searchState.total }})
           </button>
           <button
-            v-for="p in platforms"
-            :key="p"
-            :class="['filter-pill', { active: filterPlatform === p }]"
-            @click="filterPlatform = p">
-            {{ platformName(p) }} ({{ searchState.merged[p]?.length || 0 }})
+            v-for="p in platformList"
+            :key="p.key"
+            :class="['filter-pill', { active: filterState.platform === p.key }]"
+            @click="onPlatformChange(p.key)">
+            {{ p.name }} ({{ p.count }})
           </button>
         </div>
 
@@ -97,6 +112,9 @@
           :special-quality-counts="specialQualityCounts"
           @reset="resetFilterState" />
 
+        <!-- 结果区平滑定位锚点 -->
+        <div id="results-anchor" class="results-anchor" aria-hidden="true" />
+
         <!-- 搜索结果 -->
         <section v-if="hasResults" class="results-section">
           <div v-if="groupedResults.length > 0" class="results-grid">
@@ -111,7 +129,8 @@
               :initial-visible="initialVisible"
               :can-toggle-collapse="false"
               @toggle="handleToggle(group.type)"
-              @copy="copyLink" />
+              @copy="copyLink"
+              @push-nas="openPushDrawer" />
           </div>
           <div v-else class="filter-empty-card">
             <p class="filter-empty-text">
@@ -171,11 +190,19 @@
         <FilmExploreSection ref="filmExploreRef" :on-search="quickSearch" />
       </ErrorBoundary>
     </section>
+
+    <!-- NAS 离线下载推送抽屉 -->
+    <PushDrawer
+      :visible="pushDrawerVisible"
+      :item="currentPushItem"
+      @close="pushDrawerVisible = false"
+      @success="handlePushSuccess" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import PushDrawer from "~/components/PushDrawer.vue";
 import { PLATFORM_INFO } from "~/config/plugins";
 import { isBotUA } from "~/utils/botUA";
 import {
@@ -199,9 +226,64 @@ const filmExploreRef = ref<InstanceType<typeof FilmExploreSection> | null>(null)
 const currentDoubanId = ref<string>("");
 const lastDoubanKw = ref<string>("");
 
-// 页面加载时初始化影视探索数据
+// NAS 离线推送抽屉状态
+const pushDrawerVisible = ref(false);
+const currentPushItem = ref<any>(null);
+
+function openPushDrawer(item: any) {
+  currentPushItem.value = item;
+  pushDrawerVisible.value = true;
+}
+
+function handlePushSuccess() {
+  // 推送成功回调
+}
+
+// 智能紧凑吸顶状态与定位控制
+const isStickyActive = ref(false);
+
+function onLayoutScroll() {
+  if (typeof window === "undefined") return;
+  const layout = document.querySelector(".layout");
+  const scrollTop = layout ? layout.scrollTop : window.scrollY;
+  // 当视口滚动超过 240px 时平滑滑入紧凑吸顶栏
+  isStickyActive.value = scrollTop > 240;
+}
+
+function scrollToAnchor() {
+  if (typeof window === "undefined") return;
+  nextTick(() => {
+    const anchor = document.getElementById("results-anchor");
+    const layout = document.querySelector(".layout");
+    if (anchor && layout) {
+      const top = anchor.offsetTop - 120; // 预留 TopAppBar (60px) + CompactStickyBar (50px) 空间
+      layout.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    } else if (layout) {
+      layout.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (anchor) {
+      anchor.scrollIntoView({ behavior: "smooth" });
+    }
+  });
+}
+
+function onPlatformChange(platform: string) {
+  filterState.value.platform = platform;
+  if (isStickyActive.value) {
+    scrollToAnchor();
+  }
+}
+
+// 页面加载时初始化影视探索数据与滚动监听
 onMounted(async () => {
   await nextTick();
+  if (typeof window !== "undefined") {
+    const layout = document.querySelector(".layout");
+    if (layout) {
+      layout.addEventListener("scroll", onLayoutScroll, { passive: true });
+    }
+    window.addEventListener("scroll", onLayoutScroll, { passive: true });
+  }
+
   // 从 URL 读取搜索关键词
   const q = route.query.q;
   if (q && typeof q === "string") {
@@ -217,6 +299,16 @@ onMounted(async () => {
     }
   }
   if (filmExploreRef.value) await filmExploreRef.value.init();
+});
+
+onUnmounted(() => {
+  if (typeof window !== "undefined") {
+    const layout = document.querySelector(".layout");
+    if (layout) {
+      layout.removeEventListener("scroll", onLayoutScroll);
+    }
+    window.removeEventListener("scroll", onLayoutScroll);
+  }
 });
 
 // SEO 元数据
@@ -407,6 +499,9 @@ const filterState = ref<FilterState>(getDefaultFilterState());
 
 function resetFilterState() {
   filterState.value = getDefaultFilterState();
+  if (isStickyActive.value) {
+    scrollToAnchor();
+  }
 }
 
 // 平台信息列表（带数量与图标，按数量降序）
@@ -534,6 +629,7 @@ function isExpanded(type: string) {
 
 function handleToggle(type: string) {
   filterState.value.platform = type;
+  scrollToAnchor();
 }
 
 function visibleItems(type: string, items: any[]) {
@@ -547,6 +643,14 @@ function visibleItems(type: string, items: any[]) {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.results-anchor {
+  display: block;
+  height: 1px;
+  margin-top: -1px;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* 英雄区域 + 热门搜索（frontend-design: editorial + industrial） */
@@ -850,7 +954,7 @@ function visibleItems(type: string, items: any[]) {
 .workspace-sidebar {
   min-width: 0;
   position: sticky;
-  top: 80px;
+  top: 124px;
 }
 
 @media (max-width: 1024px) {
