@@ -52,3 +52,4 @@ docker run -d -p 4000:4000 ghcr.io/wu529778790/panhub.shenzjd.com:latest
 - ✅ 允许个人学习、研究等**非商业用途**的自由使用、修改与分发
 - ❌ 任何商业用途（包括但不限于销售、收费服务、商业网站部署、广告变现）需事先获得作者书面授权
 - 📮 商务合作请联系：[Telegram](https://t.me/shenzjd_com)
+- 
