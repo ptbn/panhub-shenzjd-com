@@ -83,3 +83,11 @@ export function maybeShowUnlockAd(): void {
       console.warn("[floating-unlock] 自愿支持弹窗不可用，跳过", e);
     });
 }
+export function useUnlockAd() {
+  return {
+    maybeShowUnlockAd,
+    resolveFloatingUnlock,
+  };
+}
+
+export default useUnlockAd;
