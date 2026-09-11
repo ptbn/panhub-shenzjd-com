@@ -176,7 +176,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import type { FilterState, ResolutionType, MediaType, YearRange, QualityTag, SortOption } from "~/composables/useResourceParser";
-import { getDefaultFilterState } from "~/composables/useResourceParser";
+import { getDefaultFilterState, getDynamicYearRanges } from "~/composables/useResourceParser";
 
 interface PlatformItem {
   key: string;
@@ -218,13 +218,7 @@ const mediaTypes = [
   { key: "show" as MediaType, label: "综艺" },
 ];
 
-const yearRanges = [
-  { key: "2024-2025" as YearRange, label: "2024-2025" },
-  { key: "2020-2023" as YearRange, label: "2020-2023" },
-  { key: "2010-2019" as YearRange, label: "2010 年代" },
-  { key: "2000-2009" as YearRange, label: "2000 年代" },
-  { key: "before-2000" as YearRange, label: "2000 以前 (经典)" },
-];
+const yearRanges = getDynamicYearRanges();
 
 const specialQualities: QualityTag[] = ["REMUX", "杜比视界", "HDR", "蓝光", "高帧率"];
 

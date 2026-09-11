@@ -169,6 +169,8 @@ import {
   matchesFilter,
   compareResources,
   getDefaultFilterState,
+  getDynamicYearRanges,
+  parseYearRange,
   type FilterState,
 } from "~/composables/useResourceParser";
 
@@ -429,24 +431,23 @@ const typeCounts = computed(() => {
   return counts;
 });
 
-// 年代各维度计数
+// 年代各维度计数（根据当前年份动态区间统计）
+const dynamicYearOptions = getDynamicYearRanges();
 const yearCounts = computed(() => {
-  const counts: Record<string, number> = {
-    "2024-2025": 0,
-    "2020-2023": 0,
-    "2010-2019": 0,
-    "2000-2009": 0,
-    "before-2000": 0,
-  };
+  const counts: Record<string, number> = {};
+  for (const opt of dynamicYearOptions) {
+    counts[opt.key] = 0;
+  }
   for (const { item } of allRawItems.value) {
     const meta = parseResourceMeta(item?.note || item?.url || "");
     const y = meta.year;
     if (y) {
-      if (y >= 2024 && y <= 2025) counts["2024-2025"]++;
-      else if (y >= 2020 && y <= 2023) counts["2020-2023"]++;
-      else if (y >= 2010 && y <= 2019) counts["2010-2019"]++;
-      else if (y >= 2000 && y <= 2009) counts["2000-2009"]++;
-      else if (y < 2000) counts["before-2000"]++;
+      for (const opt of dynamicYearOptions) {
+        const range = parseYearRange(opt.key);
+        if (range && y >= range.startYear && y <= range.endYear) {
+          counts[opt.key]++;
+        }
+      }
     }
   }
   return counts;

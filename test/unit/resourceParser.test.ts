@@ -4,6 +4,7 @@ import {
   matchesFilter,
   compareResources,
   getDefaultFilterState,
+  getDynamicYearRanges,
 } from "../../composables/useResourceParser";
 
 describe("useResourceParser 智能特征解析引擎测试", () => {
@@ -56,11 +57,13 @@ describe("useResourceParser 智能特征解析引擎测试", () => {
     filter.resolution = "1080P";
     expect(matchesFilter(meta, filter, "quark")).toBe(false);
 
-    // 过滤年份：2020-2023 应匹配，2024-2025 不匹配
+    // 过滤年份：2020-2023 应匹配，2026 不匹配
     filter.resolution = "all";
     filter.yearRange = "2020-2023";
     expect(matchesFilter(meta, filter, "quark")).toBe(true);
-    filter.yearRange = "2024-2025";
+    filter.yearRange = "2022";
+    expect(matchesFilter(meta, filter, "quark")).toBe(true);
+    filter.yearRange = "2026";
     expect(matchesFilter(meta, filter, "quark")).toBe(false);
 
     // 过滤网盘
@@ -68,6 +71,14 @@ describe("useResourceParser 智能特征解析引擎测试", () => {
     filter.platform = "aliyun";
     expect(matchesFilter(meta, filter, "quark")).toBe(false);
     expect(matchesFilter(meta, filter, "aliyun")).toBe(true);
+  });
+
+  it("动态年份生成器应返回包含当前年份的选项", () => {
+    const options = getDynamicYearRanges();
+    const currentYear = String(new Date().getFullYear());
+    expect(options[0].key).toBe(currentYear);
+    expect(options[0].label).toContain(currentYear);
+    expect(options.some(o => o.key === "before-2000")).toBe(true);
   });
 
   it("清晰度优先排序逻辑测试", () => {

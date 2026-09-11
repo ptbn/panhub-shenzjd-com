@@ -9,7 +9,45 @@ import ptt from "parse-torrent-title";
 export type ResolutionType = "all" | "4K" | "1080P" | "720P" | "other";
 export type MediaType = "all" | "movie" | "tv" | "anime" | "doc" | "show" | "other";
 export type QualityTag = "REMUX" | "杜比视界" | "HDR" | "蓝光" | "高帧率";
-export type YearRange = "all" | "2024-2025" | "2020-2023" | "2010-2019" | "2000-2009" | "before-2000";
+export type YearRange = string;
+
+export interface YearRangeOption {
+  key: string;
+  label: string;
+}
+
+/**
+ * 动态获取年代筛选项（跟随时钟自动演进，涵盖当年最新、去年、前年以及分段年代）
+ */
+export function getDynamicYearRanges(): YearRangeOption[] {
+  const now = new Date().getFullYear();
+  return [
+    { key: `${now}`, label: `${now} (最新)` },
+    { key: `${now - 1}`, label: `${now - 1}` },
+    { key: `${now - 2}`, label: `${now - 2}` },
+    { key: `2020-${now - 3}`, label: `2020-${now - 3}` },
+    { key: "2010-2019", label: "2010 年代" },
+    { key: "2000-2009", label: "2000 年代" },
+    { key: "before-2000", label: "2000 以前 (经典)" },
+  ];
+}
+
+/**
+ * 解析各种格式的年代字符串为 { startYear, endYear }
+ */
+export function parseYearRange(rangeKey?: string): { startYear: number; endYear: number } | null {
+  if (!rangeKey || rangeKey === "all") return null;
+  if (rangeKey === "before-2000") return { startYear: 1900, endYear: 1999 };
+  if (/^\d{4}$/.test(rangeKey)) {
+    const y = parseInt(rangeKey, 10);
+    return { startYear: y, endYear: y };
+  }
+  const match = rangeKey.match(/^(\d{4})-(\d{4})$/);
+  if (match) {
+    return { startYear: parseInt(match[1], 10), endYear: parseInt(match[2], 10) };
+  }
+  return null;
+}
 export type SortOption = "default" | "quality-desc" | "year-desc" | "year-asc";
 
 export interface ParsedResourceMeta {
@@ -256,11 +294,12 @@ export function matchesFilter(
   // 5. 年份区间过滤
   if (filters.yearRange !== "all") {
     if (!meta.year) return false;
-    if (filters.yearRange === "2024-2025" && (meta.year < 2024 || meta.year > 2025)) return false;
-    if (filters.yearRange === "2020-2023" && (meta.year < 2020 || meta.year > 2023)) return false;
-    if (filters.yearRange === "2010-2019" && (meta.year < 2010 || meta.year > 2019)) return false;
-    if (filters.yearRange === "2000-2009" && (meta.year < 2000 || meta.year > 2009)) return false;
-    if (filters.yearRange === "before-2000" && meta.year >= 2000) return false;
+    const parsedRange = parseYearRange(filters.yearRange);
+    if (parsedRange) {
+      if (meta.year < parsedRange.startYear || meta.year > parsedRange.endYear) {
+        return false;
+      }
+    }
   }
 
   return true;

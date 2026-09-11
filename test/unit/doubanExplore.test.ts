@@ -67,6 +67,16 @@ describe("DoubanExploreService - 影视多维探索服务", () => {
     expect(decoded).toContain("year_range=1920,1999");
   });
 
+  it("动态单一年份应映射为相同起止年份 (如 2026 -> 2026,2026)", () => {
+    const query: DoubanExploreQuery = {
+      yearRange: "2026",
+    };
+    const url = buildDoubanExploreUrl(query);
+    const decoded = decodeURIComponent(url);
+
+    expect(decoded).toContain("year_range=2026,2026");
+  });
+
   it("内存缓存功能应正常存储与读取", () => {
     const cacheKey = "douban-explore:test";
     const dummyData = {

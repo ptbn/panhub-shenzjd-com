@@ -47,6 +47,23 @@ export const exploreCache = new MemoryCache<DoubanExploreResult>({
 });
 
 /**
+ * 解析各种格式的年代字符串为 { startYear, endYear }
+ */
+export function parseYearRange(rangeKey?: string): { startYear: number; endYear: number } | null {
+  if (!rangeKey || rangeKey === "all") return null;
+  if (rangeKey === "before-2000") return { startYear: 1920, endYear: 1999 };
+  if (/^\d{4}$/.test(rangeKey)) {
+    const y = parseInt(rangeKey, 10);
+    return { startYear: y, endYear: y };
+  }
+  const match = rangeKey.match(/^(\d{4})-(\d{4})$/);
+  if (match) {
+    return { startYear: parseInt(match[1], 10), endYear: parseInt(match[2], 10) };
+  }
+  return null;
+}
+
+/**
  * 构建向豆瓣发起请求的 URL 与参数
  */
 export function buildDoubanExploreUrl(query: DoubanExploreQuery): string {
@@ -71,11 +88,12 @@ export function buildDoubanExploreUrl(query: DoubanExploreQuery): string {
 
   // 3. 映射年份区间
   let yearRangeParam = "";
-  if (query.yearRange === "2024-2025") yearRangeParam = "2024,2025";
-  else if (query.yearRange === "2020-2023") yearRangeParam = "2020,2023";
-  else if (query.yearRange === "2010-2019") yearRangeParam = "2010,2019";
-  else if (query.yearRange === "2000-2009") yearRangeParam = "2000,2009";
-  else if (query.yearRange === "before-2000") yearRangeParam = "1920,1999";
+  if (query.yearRange && query.yearRange !== "all") {
+    const parsedYear = parseYearRange(query.yearRange);
+    if (parsedYear) {
+      yearRangeParam = `${parsedYear.startYear},${parsedYear.endYear}`;
+    }
+  }
 
   // 4. 排序模式
   const sort = query.sort && ["U", "S", "R", "T"].includes(query.sort) ? query.sort : "U";

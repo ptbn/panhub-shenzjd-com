@@ -209,6 +209,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import type { DoubanExploreItem } from "~/server/core/services/doubanExploreService";
+import { getDynamicYearRanges } from "~/composables/useResourceParser";
 
 interface Props {
   onSearch: (term: string) => void;
@@ -273,11 +274,7 @@ const genreOptions = [
 
 const yearOptions = [
   { key: "all", label: "全部年代" },
-  { key: "2024-2025", label: "2024-2025 (最新)" },
-  { key: "2020-2023", label: "2020-2023" },
-  { key: "2010-2019", label: "2010 年代" },
-  { key: "2000-2009", label: "2000 年代" },
-  { key: "before-2000", label: "90年代以前 (经典)" },
+  ...getDynamicYearRanges(),
 ];
 
 const hasActiveFilter = computed(() => {
