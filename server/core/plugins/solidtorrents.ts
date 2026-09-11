@@ -39,7 +39,7 @@ async function fetchHtmlWithFallback(url: string): Promise<string> {
         "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
         referer: "https://solidtorrents.to/",
       },
-      timeout: 12000,
+      timeout: 2500,
     });
     if (
       !html ||
@@ -52,7 +52,7 @@ async function fetchHtmlWithFallback(url: string): Promise<string> {
       )}`;
       return await ofetch<string>(proxyUrl, {
         headers: { "user-agent": "Mozilla/5.0" },
-        timeout: 12000,
+        timeout: 2500,
       }).catch(() => "");
     }
     return html;
@@ -64,7 +64,7 @@ async function fetchHtmlWithFallback(url: string): Promise<string> {
     )}`;
     return ofetch<string>(proxyUrl, {
       headers: { "user-agent": "Mozilla/5.0" },
-      timeout: 12000,
+      timeout: 2500,
     }).catch(() => "");
   }
 }
@@ -82,19 +82,18 @@ async function fetchDetailMagnet(detailUrl: string): Promise<string> {
 
 export class SolidTorrentsPlugin extends BaseAsyncPlugin {
   constructor() {
-    super("solidtorrents", 4);
+    super("solidtorrents", 3);
   }
 
   override async search(
     keyword: string,
     ext?: Record<string, any>
   ): Promise<SearchResult[]> {
-    const timeoutMs = Math.max(
-      3000,
-      Number((ext as any)?.__plugin_timeout_ms) || 10000
-    );
-    const queries: string[] = [keyword];
-    if (/[^\x00-\x7F]/.test(keyword)) queries.push("movie", "1080p");
+    const kw = (keyword || "").trim();
+    if (!kw || kw.length < 2) return [];
+
+    const timeoutMs = Math.min(2500, Number((ext as any)?.__plugin_timeout_ms) || 2500);
+    const queries: string[] = [kw];
     let items: SolidItem[] = [];
     for (const kw of queries) {
       if (items.length > 0) break;

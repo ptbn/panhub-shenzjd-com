@@ -26,6 +26,9 @@ import { Quark4kPlugin } from "../plugins/quark4k";
 import { OugePlugin } from "../plugins/ouge";
 import { WanouPlugin } from "../plugins/wanou";
 import { DyyjvPlugin } from "../plugins/dyyjv";
+import { YtsPlugin } from "../plugins/yts";
+import { DmhyPlugin } from "../plugins/dmhy";
+import { SolidTorrentsPlugin } from "../plugins/solidtorrents";
 
 const SERVICE_CONTEXT_KEY = "__panhub_search_service__";
 
@@ -63,6 +66,10 @@ function createPluginManager(): PluginManager {
   //   solidtorrents / torrentgalaxy / x1337x 的处理），整站无网盘链接无保留价值
   // 2026-08-07 新增：dyyjv（电影云集，WordPress REST API，详情页内嵌夸克/百度链接）
   safeRegister("dyyjv", () => new DyyjvPlugin());
+  // 优质 BT/磁力检索源（自带 2.5s 极速限时与安全门禁）
+  safeRegister("yts", () => new YtsPlugin());
+  safeRegister("dmhy", () => new DmhyPlugin());
+  safeRegister("solidtorrents", () => new SolidTorrentsPlugin());
   pm.registerAllGlobalPlugins();
   return pm;
 }

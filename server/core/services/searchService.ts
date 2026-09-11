@@ -18,10 +18,10 @@ import { getCanonicalDriveInfo, extractPassword } from "../../../utils/canonical
 import { loggers } from "../utils/logger";
 
 /**
- * 判断链接是否为磁力链接（产品需求：搜索结果不出现磁力链接）。
- * 按 URL 协议与 type 双重判断，避免上游把 magnet URL 标成其他 type 而漏网。
+ * 判断链接是否为磁力链接
+ * 按 URL 协议与 type 双重判断，确保可靠识别
  */
-function isMagnetLink(link: { type?: string; url?: string } | undefined | null): boolean {
+export function isMagnetLink(link: { type?: string; url?: string } | undefined | null): boolean {
   if (!link) return false;
   if (typeof link.url === "string" && link.url.toLowerCase().startsWith("magnet:")) {
     return true;
@@ -30,14 +30,19 @@ function isMagnetLink(link: { type?: string; url?: string } | undefined | null):
 }
 
 /**
- * 从结果中剔除磁力链接（原地修改 links）。
- * @returns 是否确实移除了磁力链接（供调用方判断“纯磁力资源”以丢弃整条结果）
+ * 安全门禁：过滤公网恶意后缀与博彩/垃圾推广词
  */
-function stripMagnetLinks(result: SearchResult): boolean {
-  if (!Array.isArray(result.links) || result.links.length === 0) return false;
-  const before = result.links.length;
-  result.links = result.links.filter((l) => !isMagnetLink(l));
-  return result.links.length !== before;
+export function isSafeResource(result: SearchResult): boolean {
+  const text = `${result.title || ""} ${result.content || ""}`;
+  // 拦截木马与恶意伪装后缀（如 .exe, .scr, .bat, .apk, .vbs）
+  if (/\.(exe|scr|bat|apk|vbs|cmd|com|pif)(\.|\s|$)/i.test(text)) {
+    return false;
+  }
+  // 拦截常见博彩诈骗垃圾词
+  if (/(澳门新葡京|现金棋牌|官方直营|真人荷官|色情直播|六合彩)/i.test(text)) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -233,12 +238,10 @@ export class SearchService {
 
     const filteredForResults: SearchResult[] = [];
     for (const result of relevantResults) {
-      // 统一剔除磁力链接（TG / 插件来源都覆盖）
-      const strippedMagnet = stripMagnetLinks(result);
+      // 安全门禁：过滤恶意木马与博彩垃圾词
+      if (!isSafeResource(result)) continue;
       const hasTime = !!result.datetime;
       const hasLinks = Array.isArray(result.links) && result.links.length > 0;
-      // 原本只有磁力链接的资源（如种子站点结果）过滤后无链接，整条不展示
-      if (strippedMagnet && !hasLinks) continue;
       if (hasTime || hasLinks) {
         filteredForResults.push(result);
       }
@@ -622,13 +625,13 @@ export class SearchService {
     const seenByCanonical = new Map<string, number>();
 
     for (const result of results) {
+      // 安全门禁：过滤恶意木马与博彩垃圾词
+      if (!isSafeResource(result)) continue;
       // 隔离闸 C：即使上游插件返回畸形 links（非数组）也不会在此抛错
       if (!Array.isArray(result.links)) continue;
       for (const link of result.links) {
         if (!link || typeof link.url !== "string") continue;
-        // 磁力链接一律不进聚合结果（双保险，防上游 type 标注异常）
-        if (isMagnetLink(link)) continue;
-        const type = (link.type || "").toLowerCase();
+        const type = isMagnetLink(link) ? "magnet" : (link.type || "").toLowerCase();
         if (allow && !allow.has(type)) continue;
         if (!out[type]) out[type] = [];
 

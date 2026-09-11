@@ -116,7 +116,7 @@
               class="copy-btn"
               :class="{ 'copy-btn--copied': copiedUrl === r.url }"
               @click.prevent="handleCopy(r.url)"
-              :title="copiedUrl === r.url ? '已复制' : '复制链接'">
+              :title="copiedUrl === r.url ? '已复制' : (isMagnet(r) ? '复制磁力链接' : '复制链接')">
               <svg v-if="copiedUrl !== r.url" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -124,7 +124,7 @@
               <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
-              {{ copiedUrl === r.url ? '已复制' : '复制' }}
+              {{ copiedUrl === r.url ? '已复制' : (isMagnet(r) ? '复制磁力' : '复制') }}
             </button>
           </div>
         </div>
@@ -171,7 +171,12 @@ const visibleItems = computed(() =>
   props.expanded ? props.items : props.items.slice(0, props.initialVisible)
 );
 
+function isMagnet(r: any): boolean {
+  return typeof r?.url === "string" && r.url.toLowerCase().startsWith("magnet:");
+}
+
 function linkStatus(r: any) {
+  if (isMagnet(r)) return undefined;
   return statusOf(r.url)?.status;
 }
 
@@ -180,10 +185,12 @@ watch(
   (items) => {
     if (!items || items.length === 0) return;
     enqueue(
-      items.map((r) => ({
-        url: typeof r.url === "string" ? r.url : "",
-        password: typeof r.password === "string" ? r.password : "",
-      }))
+      items
+        .filter((r) => !isMagnet(r))
+        .map((r) => ({
+          url: typeof r.url === "string" ? r.url : "",
+          password: typeof r.password === "string" ? r.password : "",
+        }))
     );
   },
   { immediate: true }

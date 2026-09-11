@@ -47,6 +47,18 @@ export function getCanonicalDriveInfo(rawUrl: string): CanonicalInfo {
     };
   }
 
+  // 0. 磁力链接 (magnet:?xt=urn:btih:...)
+  if (url.toLowerCase().startsWith("magnet:")) {
+    const hashMatch = /urn:btih:([a-zA-Z0-9]+)/i.exec(url);
+    const hash = (hashMatch ? hashMatch[1] : url).toLowerCase();
+    return {
+      platform: "magnet",
+      shareId: hash,
+      canonicalKey: `magnet:${hash}`,
+      cleanUrl: url,
+    };
+  }
+
   // 1. 夸克网盘 (pan.quark.cn / b.quark.cn)
   // 例: https://pan.quark.cn/s/669fbb7c66cb, https://b.quark.cn/s/669fbb7c66cb
   const quarkMatch = /(?:pan|b)\.quark\.cn\/s\/([a-zA-Z0-9]+)/i.exec(url);

@@ -61,4 +61,18 @@ describe("URL Canonicalization 规范化与去重测试", () => {
     expect(gen.cleanUrl).toBe("https://example.com/share/item1");
     expect(gen.canonicalKey).toBe("general:https://example.com/share/item1");
   });
+
+  it("正确规范化 Magnet 磁力链接并归一化 BTIH 物理去重键", () => {
+    const m1 = "magnet:?xt=urn:btih:3b10b06b986b245a4a58b2cdfe42a6327b7f8c14&dn=Movie.1080p";
+    const m2 = "magnet:?xt=urn:btih:3B10B06B986B245A4A58B2CDFE42A6327B7F8C14&tr=udp://tracker.opentrackr.org";
+
+    const c1 = getCanonicalDriveInfo(m1);
+    const c2 = getCanonicalDriveInfo(m2);
+
+    expect(c1.platform).toBe("magnet");
+    expect(c2.platform).toBe("magnet");
+    expect(c1.shareId).toBe("3b10b06b986b245a4a58b2cdfe42a6327b7f8c14");
+    expect(c2.shareId).toBe("3b10b06b986b245a4a58b2cdfe42a6327b7f8c14");
+    expect(c1.canonicalKey).toBe(c2.canonicalKey);
+  });
 });
