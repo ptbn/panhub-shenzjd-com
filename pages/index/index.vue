@@ -80,21 +80,40 @@
       </div>
     </div>
 
+    <!-- 多维资源筛选栏 -->
+    <SearchFilterBar
+      v-if="hasResults"
+      v-model="filterState"
+      :total-count="searchState.total"
+      :filtered-count="totalFilteredCount"
+      :platform-list="platformList"
+      :resolution-counts="resolutionCounts"
+      :type-counts="typeCounts"
+      :year-counts="yearCounts"
+      :special-quality-counts="specialQualityCounts"
+      @reset="resetFilterState" />
+
     <!-- 搜索结果 -->
     <section v-if="hasResults" class="results-section">
-      <div class="results-grid">
+      <div v-if="groupedResults.length > 0" class="results-grid">
         <ResultGroup
           v-for="group in groupedResults"
           :key="group.type"
           :title="platformName(group.type)"
           :color="platformColor(group.type)"
           :icon="platformIcon(group.type)"
-          :items="visibleSorted(group.items)"
-          :expanded="filterPlatform !== 'all' || isExpanded(group.type)"
+          :items="group.items"
+          :expanded="filterState.platform !== 'all' || isExpanded(group.type)"
           :initial-visible="initialVisible"
           :can-toggle-collapse="false"
           @toggle="handleToggle(group.type)"
           @copy="copyLink" />
+      </div>
+      <div v-else class="filter-empty-card">
+        <p class="filter-empty-text">
+          🔍 未找到符合当前组合筛选条件的资源，请尝试切换筛选标签或
+          <button class="filter-reset-link" @click="resetFilterState">重置筛选</button>
+        </p>
       </div>
     </section>
 
@@ -132,19 +151,26 @@
       <span>{{ searchState.error }}</span>
     </section>
 
-    <!-- 豆瓣电影新片榜 - 搜索时隐藏 -->
+    <!-- 影视片库多维探索发现 - 搜索时隐藏 -->
     <section v-if="!searched" class="douban-hot-section">
-      <ErrorBoundary message="豆瓣热榜加载失败">
-        <DoubanHotSection ref="doubanHotRef" :on-search="quickSearch" />
+      <ErrorBoundary message="影视探索加载失败">
+        <FilmExploreSection ref="filmExploreRef" :on-search="quickSearch" />
       </ErrorBoundary>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { PLATFORM_INFO } from "~/config/plugins";
 import { isBotUA } from "~/utils/botUA";
+import {
+  parseResourceMeta,
+  matchesFilter,
+  compareResources,
+  getDefaultFilterState,
+  type FilterState,
+} from "~/composables/useResourceParser";
 
 const config = useRuntimeConfig();
 const apiBase = (config.public?.apiBase as string) || "/api";
@@ -152,10 +178,10 @@ const siteUrl = (config.public?.siteUrl as string) || "";
 const route = useRoute();
 const router = useRouter();
 
-// 豆瓣热榜组件引用
-const doubanHotRef = ref<InstanceType<typeof DoubanHotSection> | null>(null);
+// 影视片库探索组件引用
+const filmExploreRef = ref<InstanceType<typeof FilmExploreSection> | null>(null);
 
-// 页面加载时初始化豆瓣数据
+// 页面加载时初始化影视探索数据
 onMounted(async () => {
   await nextTick();
   // 从 URL 读取搜索关键词
@@ -172,7 +198,7 @@ onMounted(async () => {
       await onSearch();
     }
   }
-  if (doubanHotRef.value) await doubanHotRef.value.init();
+  if (filmExploreRef.value) await filmExploreRef.value.init();
 });
 
 // SEO 元数据
@@ -333,16 +359,16 @@ async function handleContinueSearch() {
 async function fullReset() {
   // 清空输入框和重置状态
   kw.value = "";
-  filterPlatform.value = "all";
+  resetFilterState();
   expandedSet.value = new Set();
   resetSearch();
   // 清除 URL 参数
   if (router) {
     router.replace({ query: {} });
   }
-  // 刷新页面以恢复初始状态（包括豆瓣电影）
+  // 刷新页面以恢复初始状态（包括影视探索）
   await nextTick();
-  if (doubanHotRef.value) await doubanHotRef.value.init();
+  if (filmExploreRef.value) await filmExploreRef.value.init();
 }
 
 // 平台信息
@@ -350,30 +376,130 @@ const platformIcon = (t: string): string => PLATFORM_INFO[t]?.icon || "📦";
 const platformName = (t: string): string => PLATFORM_INFO[t]?.name || t;
 const platformColor = (t: string): string => PLATFORM_INFO[t]?.color || "#9ca3af";
 
-// 获取所有有结果的平台类型。
-// 2026-09-04：SSE 流推送时 merged 的 key 按首个结果到达顺序插入，次序随机，
-// 这里按结果数量降序 → tab（pill）从左到右为数量多的平台。
-const platforms = computed(() => {
+// 多维筛选状态
+const filterState = ref<FilterState>(getDefaultFilterState());
+
+function resetFilterState() {
+  filterState.value = getDefaultFilterState();
+}
+
+// 平台信息列表（带数量与图标，按数量降序）
+const platformList = computed(() => {
   const m = searchState.value?.merged ?? {};
   return Object.keys(m)
     .filter((type) => (m[type]?.length ?? 0) > 0)
-    .sort((a, b) => (m[b]?.length ?? 0) - (m[a]?.length ?? 0));
+    .sort((a, b) => (m[b]?.length ?? 0) - (m[a]?.length ?? 0))
+    .map((type) => ({
+      key: type,
+      name: platformName(type),
+      count: m[type]?.length ?? 0,
+      icon: platformIcon(type),
+    }));
 });
 
+// 所有原始结果扁平数组（供各维度计数统计）
+const allRawItems = computed(() => {
+  const m = searchState.value?.merged ?? {};
+  const list: Array<{ item: any; platform: string }> = [];
+  for (const p of Object.keys(m)) {
+    for (const item of m[p] || []) {
+      list.push({ item, platform: p });
+    }
+  }
+  return list;
+});
+
+// 清晰度各维度计数
+const resolutionCounts = computed(() => {
+  const counts: Record<string, number> = { "4K": 0, "1080P": 0, "720P": 0 };
+  for (const { item } of allRawItems.value) {
+    const meta = parseResourceMeta(item?.note || item?.url || "");
+    if (meta.resolution in counts) counts[meta.resolution]++;
+  }
+  return counts;
+});
+
+// 类型各维度计数
+const typeCounts = computed(() => {
+  const counts: Record<string, number> = { movie: 0, tv: 0, anime: 0, doc: 0, show: 0 };
+  for (const { item } of allRawItems.value) {
+    const meta = parseResourceMeta(item?.note || item?.url || "");
+    if (meta.mediaType in counts) counts[meta.mediaType]++;
+  }
+  return counts;
+});
+
+// 年代各维度计数
+const yearCounts = computed(() => {
+  const counts: Record<string, number> = {
+    "2024-2025": 0,
+    "2020-2023": 0,
+    "2010-2019": 0,
+    "2000-2009": 0,
+    "before-2000": 0,
+  };
+  for (const { item } of allRawItems.value) {
+    const meta = parseResourceMeta(item?.note || item?.url || "");
+    const y = meta.year;
+    if (y) {
+      if (y >= 2024 && y <= 2025) counts["2024-2025"]++;
+      else if (y >= 2020 && y <= 2023) counts["2020-2023"]++;
+      else if (y >= 2010 && y <= 2019) counts["2010-2019"]++;
+      else if (y >= 2000 && y <= 2009) counts["2000-2009"]++;
+      else if (y < 2000) counts["before-2000"]++;
+    }
+  }
+  return counts;
+});
+
+// 特殊画质规格各维度计数
+const specialQualityCounts = computed(() => {
+  const counts: Record<string, number> = {
+    REMUX: 0,
+    "杜比视界": 0,
+    HDR: 0,
+    "蓝光": 0,
+    "高帧率": 0,
+  };
+  for (const { item } of allRawItems.value) {
+    const meta = parseResourceMeta(item?.note || item?.url || "");
+    for (const tag of meta.qualityTags) {
+      if (tag in counts) counts[tag]++;
+    }
+  }
+  return counts;
+});
+
+// 响应式多维过滤与排序结果
 const groupedResults = computed(() => {
   const list: Array<{ type: string; items: any[] }> = [];
-  const source =
-    filterPlatform.value === "all"
-      ? searchState.value.merged
-      : { [filterPlatform.value]: searchState.value.merged[filterPlatform.value] || [] };
+  const source = searchState.value?.merged ?? {};
+  const currentFilters = filterState.value;
+
   for (const type of Object.keys(source)) {
-    if (!source[type]?.length) continue;
-    list.push({ type, items: source[type] || [] });
+    const rawItems = source[type] || [];
+    if (!rawItems.length) continue;
+
+    // 结合当前多维条件进行过滤
+    const filtered = rawItems.filter((item: any) => {
+      const meta = parseResourceMeta(item?.note || item?.url || "");
+      return matchesFilter(meta, currentFilters, type);
+    });
+
+    if (filtered.length > 0) {
+      // 根据所选排序模式实时重排
+      const sorted = [...filtered].sort((a, b) => compareResources(a, b, currentFilters.sortBy));
+      list.push({ type, items: sorted });
+    }
   }
-  // 数量多的平台排前面（与上方 platforms tab 顺序一致）：
-  // 流推送各组到达顺序不定，不能依赖 merged 的 key 顺序
+
+  // 数量多的平台排前面
   list.sort((a, b) => (b.items?.length ?? 0) - (a.items?.length ?? 0));
   return list;
+});
+
+const totalFilteredCount = computed(() => {
+  return groupedResults.value.reduce((acc, g) => acc + (g.items?.length || 0), 0);
 });
 
 // 展开/收起
@@ -382,26 +508,11 @@ function isExpanded(type: string) {
 }
 
 function handleToggle(type: string) {
-  filterPlatform.value = type;
+  filterState.value.platform = type;
 }
 
 function visibleItems(type: string, items: any[]) {
   return isExpanded(type) ? items : items.slice(0, initialVisible);
-}
-
-// 排序（2026-09-04：SSE 流推送时 merge 数组按到达批次 push，组内顺序乱序，
-// 固定按发布时间降序在展示层实时重排——最新到达的结果永远在最前。
-// 产品决定移除其它排序选项，故不再有 sortType 状态）
-function sortItems(items: any[]) {
-  return [...items].sort(
-    (a, b) =>
-      new Date(b?.datetime || "1970-01-01").getTime() -
-      new Date(a?.datetime || "1970-01-01").getTime()
-  );
-}
-
-function visibleSorted(items: any[]) {
-  return sortItems(items);
 }
 </script>
 
@@ -703,6 +814,44 @@ function visibleSorted(items: any[]) {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
+}
+
+.filter-empty-card {
+  padding: 36px 24px;
+  background: var(--bg-primary);
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  margin: 16px 0;
+}
+
+.filter-empty-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-reset-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: all 0.2s ease;
+}
+
+.filter-reset-link:hover {
+  opacity: 0.8;
+  transform: translateY(-1px);
 }
 
 /* 空状态 */

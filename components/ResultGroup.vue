@@ -60,6 +60,40 @@
                 提取码: {{ r.password }}
               </span>
 
+              <!-- 智能特征标签 -->
+              <span v-if="getMeta(r).size" class="meta-tag badge-size">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                {{ getMeta(r).size }}
+              </span>
+              <span v-if="getMeta(r).resolution !== 'other'" class="meta-tag badge-res" :class="'badge-res--' + getMeta(r).resolution.toLowerCase()">
+                {{ getMeta(r).resolution }}
+              </span>
+              <span v-if="getMeta(r).codec" class="meta-tag badge-codec">
+                {{ getMeta(r).codec }}
+              </span>
+              <span v-if="getMeta(r).audio" class="meta-tag badge-audio">
+                {{ getMeta(r).audio }}
+              </span>
+              <span v-if="getMeta(r).subtitles" class="meta-tag badge-sub">
+                {{ getMeta(r).subtitles }}
+              </span>
+              <span v-if="getMeta(r).episodeInfo" class="meta-tag badge-ep">
+                {{ getMeta(r).episodeInfo }}
+              </span>
+              <span v-if="getMeta(r).year" class="meta-tag badge-year">
+                {{ getMeta(r).year }}
+              </span>
+              <span v-if="getMeta(r).mediaType !== 'other'" class="meta-tag badge-type">
+                {{ formatMediaType(getMeta(r).mediaType) }}
+              </span>
+              <span v-for="tag in getMeta(r).qualityTags" :key="tag" class="meta-tag badge-quality">
+                {{ tag }}
+              </span>
+
               <!-- 服务端探活结果角标（异步懒查，不阻塞渲染） -->
               <span v-if="linkStatus(r) === 'bad'" class="meta-tag dead">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -110,6 +144,8 @@
 </template>
 
 <script setup lang="ts">
+import { parseResourceMeta } from "~/composables/useResourceParser";
+
 const props = defineProps<{
   title: string;
   color: string;
@@ -172,6 +208,21 @@ function formatDate(d?: string) {
   if (days < 30) return `${days}天前`;
   if (days < 365) return `${Math.floor(days / 30)}个月前`;
   return dt.toLocaleDateString("zh-CN");
+}
+
+function getMeta(r: any) {
+  return parseResourceMeta(r?.note || r?.url || "", r?.description);
+}
+
+function formatMediaType(type: string) {
+  const map: Record<string, string> = {
+    movie: "电影",
+    tv: "剧集",
+    anime: "动漫",
+    doc: "纪录片",
+    show: "综艺",
+  };
+  return map[type] || type;
 }
 </script>
 
@@ -422,6 +473,75 @@ function formatDate(d?: string) {
   background: rgba(245, 158, 11, 0.12);
   border-color: rgba(245, 158, 11, 0.25);
   color: #f59e0b;
+}
+
+/* 智能特征规格标签 */
+.meta-tag.badge-res {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.meta-tag.badge-res--4k {
+  background: rgba(147, 51, 234, 0.12);
+  color: #a855f7;
+  border-color: rgba(147, 51, 234, 0.3);
+}
+.meta-tag.badge-res--1080p {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+.meta-tag.badge-res--720p {
+  background: rgba(107, 114, 128, 0.12);
+  color: #9ca3af;
+  border-color: rgba(107, 114, 128, 0.3);
+}
+.meta-tag.badge-year {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.3);
+  font-weight: 600;
+}
+.meta-tag.badge-type {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+  font-weight: 600;
+}
+.meta-tag.badge-quality {
+  background: rgba(236, 72, 153, 0.12);
+  color: #ec4899;
+  border-color: rgba(236, 72, 153, 0.3);
+  font-weight: 600;
+}
+.meta-tag.badge-size {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+  border-color: rgba(14, 165, 233, 0.3);
+  font-weight: 700;
+}
+.meta-tag.badge-codec {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+  border-color: rgba(99, 102, 241, 0.3);
+  font-weight: 600;
+}
+.meta-tag.badge-audio {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+  border-color: rgba(249, 115, 22, 0.3);
+  font-weight: 600;
+}
+.meta-tag.badge-sub {
+  background: rgba(20, 184, 166, 0.12);
+  color: #0d9488;
+  border-color: rgba(20, 184, 166, 0.3);
+  font-weight: 500;
+}
+.meta-tag.badge-ep {
+  background: rgba(168, 85, 247, 0.12);
+  color: #9333ea;
+  border-color: rgba(168, 85, 247, 0.3);
+  font-weight: 600;
 }
 
 /* 失效链接：删除线 + 弱化 */

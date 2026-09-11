@@ -41,4 +41,20 @@ describe("mergeMergedByType", () => {
     expect(target.aliyun).toHaveLength(1);
     expect(result.aliyun).toHaveLength(2);
   });
+
+  it("应识别跨格式网盘 Canonical URL 重复并补充密码", () => {
+    const target = {
+      quark: [
+        { url: "https://pan.quark.cn/s/669fbb7c66cb", password: "", note: "流浪地球2 4K", datetime: "2024-01-01" },
+      ],
+    };
+    const incoming = {
+      quark: [
+        { url: "https://b.quark.cn/s/669fbb7c66cb?pwd=abcd#/list/share", password: "", note: "流浪地球2 4K", datetime: "2024-01-02" },
+      ],
+    };
+    const result = mergeMergedByType(target, incoming);
+    expect(result.quark).toHaveLength(1);
+    expect(result.quark![0].password).toBe("abcd");
+  });
 });

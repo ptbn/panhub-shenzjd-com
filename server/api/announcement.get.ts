@@ -13,6 +13,9 @@ export default defineEventHandler(async () => {
   return {
     code: 0,
     message: "ok",
-    data: await getAnnouncements(),
+    data: {
+      version: 1,
+      items: [],
+    },
   };
 });

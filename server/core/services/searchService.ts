@@ -13,6 +13,8 @@ import {
   type WarningInfo,
 } from "../utils/errors";
 import { buildSearchKeywordVariants, matchesSearchKeyword } from "../utils/searchKeyword";
+import { rankAndFilterSearchResults } from "../utils/searchRelevance";
+import { getCanonicalDriveInfo, extractPassword } from "../../../utils/canonicalUrl";
 import { loggers } from "../utils/logger";
 
 /**
@@ -224,28 +226,10 @@ export class SearchService {
     await Promise.all(tasks.map((task) => task()));
 
     const allResults = this.mergeSearchResults(tgResults, pluginResults);
-    this.sortResultsByTimeDesc(allResults);
 
-    // 结果与搜索关键词相关性过滤（2026-08-27 用户拍板：真实资源但
-    // 名字对不上搜索词的结果不展示）。
-    // 背景：部分插件会返回与搜索词无关的真实资源（如 dyyjv 自带
-    // 「相关推荐」板块；yunso 已于 2026-08-27 因上游 wd 参数失效从
-    // 注册表移除，u3c3 同日因纯磁力源移除）——用户搜「阿甘正传」曾
-    // 混入「好莱坞俗套大吐槽」「熊出没」等。
-    // 兜底：title/content 经 normalize 后不含关键词变体 → 整条丢弃。
-    // TG 来源在抓取阶段已按全文匹配，这里对插件来源做统一兜底。
-    // 边界：单字符关键词会触发插件兜底变体（如搜 "1" → "电影"/"movie"/
-    // "1080p"），返回的 title 可能不含单字符，此时不过滤避免误杀。
-    const keywordTrimmed = keyword.trim();
-    const relevantResults =
-      keywordTrimmed.length <= 1
-        ? allResults
-        : allResults.filter((result) => {
-            const haystack = [result.title, result.content]
-              .filter(Boolean)
-              .join(" ");
-            return matchesSearchKeyword(haystack, keyword);
-          });
+    // 采用 MiniSearch (BM25) 工业级两阶段打分与相关性引擎
+    // 精准识别核心实体，消灭单一碎片/擦边词误召回，同时实现高质量资源优先排序
+    const relevantResults = rankAndFilterSearchResults(allResults, keyword);
 
     const filteredForResults: SearchResult[] = [];
     for (const result of relevantResults) {
@@ -635,6 +619,8 @@ export class SearchService {
         ? new Set(cloudTypes.map((value) => value.toLowerCase()))
         : undefined;
     const out: MergedLinks = {};
+    const seenByCanonical = new Map<string, number>();
+
     for (const result of results) {
       // 隔离闸 C：即使上游插件返回畸形 links（非数组）也不会在此抛错
       if (!Array.isArray(result.links)) continue;
@@ -645,13 +631,33 @@ export class SearchService {
         const type = (link.type || "").toLowerCase();
         if (allow && !allow.has(type)) continue;
         if (!out[type]) out[type] = [];
+
+        const pwd = extractPassword(link.url, link.password);
+        const cInfo = getCanonicalDriveInfo(link.url);
+        const groupKey = `${type}:${cInfo.canonicalKey || link.url}`;
+
+        if (seenByCanonical.has(groupKey)) {
+          const existingIdx = seenByCanonical.get(groupKey)!;
+          const existing = out[type][existingIdx];
+          if (!existing.password && pwd) {
+            existing.password = pwd;
+          }
+          if (!existing.description && result.content) {
+            existing.description = result.content;
+          }
+          continue;
+        }
+
+        const idx = out[type].length;
         out[type].push({
           url: link.url,
-          password: link.password,
+          password: pwd,
           note: result.title,
           datetime: result.datetime,
           images: result.images,
+          description: result.content,
         });
+        seenByCanonical.set(groupKey, idx);
       }
     }
     return out;

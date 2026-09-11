@@ -11,6 +11,7 @@ export interface MergedLink {
   datetime: string;
   source?: string;
   images?: string[];
+  description?: string;
 }
 
 export type MergedLinks = Record<string, MergedLink[]>;

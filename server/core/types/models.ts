@@ -23,6 +23,7 @@ export interface MergedLink {
   datetime: string; // ISO string
   source?: string; // e.g. "tg:channel" or "plugin:name"
   images?: string[];
+  description?: string;
 }
 
 export type MergedLinks = Record<string, MergedLink[]>;
