@@ -37,7 +37,20 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
   async init(): Promise<void> {
     if (this.initialized) return;
     try {
-      await this.db.exec(D1_SCHEMA_SQL);
+      // D1 exec() 不支持多语句，逐条执行每个 DDL 语句
+      const statements = D1_SCHEMA_SQL
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      for (const sql of statements) {
+        await this.db.prepare(sql).run().catch((e: any) => {
+          // 忽略"already exists"类错误，保证幂等
+          if (!String(e).includes("already exists")) {
+            console.warn("[D1] Schema stmt warning:", sql.slice(0, 60), e);
+          }
+        });
+      }
+      // 插入默认超管账号（幂等 INSERT OR IGNORE）
       await this.db
         .prepare(
           `INSERT OR IGNORE INTO users (id, email, username, password_salt, password_hash, role, status, created_at, last_active_at)
@@ -54,6 +67,8 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
           1789361929784,
           1789361929784
         )
+        .run();
+      // 幂等迁移：尝试为旧表添加 expires_at 列
       await this.db
         .prepare("ALTER TABLE invites ADD COLUMN expires_at INTEGER")
         .run()
