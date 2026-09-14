@@ -84,9 +84,12 @@ export async function registerUser(
       if (!invite || invite.isRevoked || invite.usedBy) {
         throw new Error("邀请码无效、已过期或已被使用");
       }
+      if (invite.expiresAt && Date.now() > invite.expiresAt) {
+        throw new Error("邀请码已过期（默认有效期为 1 小时），请向管理员索取新邀请码");
+      }
       const used = await db.useInvite(code, userId);
       if (!used) {
-        throw new Error("邀请码核销失败，请重试");
+        throw new Error("邀请码核销失败，已过期或已被使用");
       }
     }
   }

@@ -54,6 +54,8 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
           1789361929784,
           1789361929784
         )
+      await this.db
+        .prepare("ALTER TABLE invites ADD COLUMN expires_at INTEGER")
         .run()
         .catch(() => {});
       this.initialized = true;
@@ -192,14 +194,15 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
   }
 
   // Invites
-  async createInvite(code: string, createdBy: string): Promise<InviteRecord> {
+  async createInvite(code: string, createdBy: string, expiresAt?: number | null): Promise<InviteRecord> {
     const now = Date.now();
     const upperCode = code.toUpperCase().trim();
+    const finalExpiresAt = expiresAt !== undefined ? expiresAt : (now + 60 * 60 * 1000);
     await this.db
       .prepare(
-        "INSERT INTO invites (code, created_by, used_by, is_revoked, created_at, used_at) VALUES (?, ?, NULL, 0, ?, NULL)"
+        "INSERT INTO invites (code, created_by, used_by, is_revoked, created_at, used_at, expires_at) VALUES (?, ?, NULL, 0, ?, NULL, ?)"
       )
-      .bind(upperCode, createdBy, now)
+      .bind(upperCode, createdBy, now, finalExpiresAt)
       .run();
     return {
       code: upperCode,
@@ -208,6 +211,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       isRevoked: 0,
       createdAt: now,
       usedAt: null,
+      expiresAt: finalExpiresAt,
     };
   }
 
@@ -224,14 +228,17 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       isRevoked: row.is_revoked,
       createdAt: row.created_at,
       usedAt: row.used_at,
+      expiresAt: row.expires_at ?? (row.created_at ? row.created_at + 60 * 60 * 1000 : null),
     };
   }
 
   async useInvite(code: string, userId: string): Promise<boolean> {
     const now = Date.now();
     const res = await this.db
-      .prepare("UPDATE invites SET used_by = ?, used_at = ? WHERE code = ? AND used_by IS NULL AND is_revoked = 0")
-      .bind(userId, now, code.toUpperCase().trim())
+      .prepare(
+        "UPDATE invites SET used_by = ?, used_at = ? WHERE code = ? AND used_by IS NULL AND is_revoked = 0 AND (expires_at IS NULL OR expires_at >= ?)"
+      )
+      .bind(userId, now, code.toUpperCase().trim(), now)
       .run();
     return res.success;
   }
@@ -255,6 +262,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       isRevoked: r.is_revoked,
       createdAt: r.created_at,
       usedAt: r.used_at,
+      expiresAt: r.expires_at ?? (r.created_at ? r.created_at + 60 * 60 * 1000 : null),
     }));
   }
 

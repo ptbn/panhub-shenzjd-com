@@ -114,7 +114,7 @@
     <div v-else-if="activeTab === 'invites'" class="tab-content">
       <div class="toolbar">
         <button class="primary-btn" @click="generateNewInvite">
-          + 一键生成 8 位一次性邀请码
+          + 一键生成 8 位邀请码（1小时有效）
         </button>
       </div>
 
@@ -125,6 +125,7 @@
               <tr>
                 <th>邀请码</th>
                 <th>创建时间</th>
+                <th>有效截止</th>
                 <th>状态</th>
                 <th>使用时间</th>
                 <th>操作</th>
@@ -134,25 +135,28 @@
               <tr v-for="inv in invites" :key="inv.code">
                 <td class="font-mono text-emerald-400 font-bold text-base tracking-wider">{{ inv.code }}</td>
                 <td class="text-xs text-gray-400">{{ formatDate(inv.createdAt) }}</td>
+                <td class="text-xs text-gray-400">{{ inv.expiresAt ? formatDate(inv.expiresAt) : '1小时有效' }}</td>
                 <td>
                   <span v-if="inv.isRevoked" class="badge badge-frozen">已作废</span>
                   <span v-else-if="inv.usedBy" class="badge badge-user">已使用</span>
+                  <span v-else-if="inv.expiresAt && Date.now() > inv.expiresAt" class="badge badge-frozen">已过期</span>
                   <span v-else class="badge badge-active">有效待使用</span>
                 </td>
                 <td class="text-xs text-gray-400">{{ inv.usedAt ? formatDate(inv.usedAt) : '-' }}</td>
                 <td class="action-cell">
                   <button
-                    v-if="!inv.usedBy && !inv.isRevoked"
+                    v-if="!inv.usedBy && !inv.isRevoked && (!inv.expiresAt || Date.now() <= inv.expiresAt)"
                     class="btn-sm btn-secondary"
                     @click="copyInviteLink(inv.code)">
                     复制邀请链接
                   </button>
                   <button
-                    v-if="!inv.usedBy && !inv.isRevoked"
+                    v-if="!inv.usedBy && !inv.isRevoked && (!inv.expiresAt || Date.now() <= inv.expiresAt)"
                     class="btn-sm btn-warn"
                     @click="revokeInvite(inv.code)">
                     作废
                   </button>
+                  <span v-else class="text-xs text-gray-500">-</span>
                 </td>
               </tr>
             </tbody>
@@ -324,7 +328,7 @@ async function resetUserPassword(userId: string) {
 async function generateNewInvite() {
   try {
     const res = await $fetch<{ invite: any }>("/api/admin/invites", { method: "POST" });
-    showToast(`成功生成 8 位邀请码: ${res.invite.code}`);
+    showToast(`成功生成 8 位邀请码: ${res.invite.code}（1小时内有效）`);
     await loadData();
   } catch (err: any) {
     showToast(err.data?.message || err.message || "生成邀请码失败");

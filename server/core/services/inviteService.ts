@@ -4,9 +4,12 @@
 import type { DatabaseAdapter, InviteRecord } from "../db/types";
 import { generateInviteCode } from "../db/crypto";
 
+export const DEFAULT_INVITE_TTL_MS = 60 * 60 * 1000; // 默认 1 小时 (3,600,000 ms)
+
 export async function createInviteCode(
   createdByUserId: string,
-  db: DatabaseAdapter
+  db: DatabaseAdapter,
+  ttlMs: number = DEFAULT_INVITE_TTL_MS
 ): Promise<InviteRecord> {
   // 生成 8 位无歧义随机码
   let code = generateInviteCode();
@@ -19,7 +22,8 @@ export async function createInviteCode(
     attempts++;
   }
 
-  return await db.createInvite(code, createdByUserId);
+  const expiresAt = Date.now() + ttlMs;
+  return await db.createInvite(code, createdByUserId, expiresAt);
 }
 
 export async function listAllInvites(db: DatabaseAdapter): Promise<InviteRecord[]> {

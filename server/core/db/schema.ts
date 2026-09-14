@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS invites (
   used_by TEXT,
   is_revoked INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
-  used_at INTEGER
+  used_at INTEGER,
+  expires_at INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS nas_profiles (

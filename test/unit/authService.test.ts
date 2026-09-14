@@ -104,6 +104,39 @@ describe("Auth & Invite Service 测试 (封闭准入、自举Admin与一次性�
     ).rejects.toThrow("邀请码无效、已过期或已被使用");
   });
 
+  it("邀请码有效期机制：默认 1 小时有效，过期后注册被拒绝拦截", async () => {
+    const admin = await registerUser(
+      {
+        email: "admin2@test.com",
+        username: "Admin2",
+        password: "Password123",
+      },
+      db
+    );
+
+    // 默认生成的邀请码有效期正好为 1 小时 (3,600,000 ms)
+    const validInvite = await createInviteCode(admin.user.id, db);
+    expect(validInvite.expiresAt).toBeDefined();
+    expect(validInvite.expiresAt! - validInvite.createdAt).toBe(60 * 60 * 1000);
+
+    // 生成一个已过期的邀请码
+    const expiredInvite = await createInviteCode(admin.user.id, db, -1000);
+    expect(expiredInvite.expiresAt).toBeLessThan(Date.now());
+
+    // 尝试使用过期邀请码注册应当被拦截
+    await expect(
+      registerUser(
+        {
+          email: "late@test.com",
+          username: "迟到者",
+          password: "Password123",
+          inviteCode: expiredInvite.code,
+        },
+        db
+      )
+    ).rejects.toThrow("邀请码已过期");
+  });
+
   it("登录验证：正确密码成功，错误密码失败，冻结账号拦截", async () => {
     await registerUser(
       {

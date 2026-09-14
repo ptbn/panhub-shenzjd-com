@@ -153,14 +153,17 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
   }
 
   // Invites
-  async createInvite(code: string, createdBy: string): Promise<InviteRecord> {
+  async createInvite(code: string, createdBy: string, expiresAt?: number | null): Promise<InviteRecord> {
+    const now = Date.now();
+    const finalExpiresAt = expiresAt !== undefined ? expiresAt : (now + 60 * 60 * 1000);
     const invite: InviteRecord = {
       code: code.toUpperCase().trim(),
       createdBy,
       usedBy: null,
       isRevoked: 0,
-      createdAt: Date.now(),
+      createdAt: now,
       usedAt: null,
+      expiresAt: finalExpiresAt,
     };
     this.invites.set(invite.code, invite);
     return { ...invite };
@@ -174,6 +177,9 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
   async useInvite(code: string, userId: string): Promise<boolean> {
     const inv = this.invites.get(code.toUpperCase().trim());
     if (!inv || inv.isRevoked || inv.usedBy) {
+      return false;
+    }
+    if (inv.expiresAt && Date.now() > inv.expiresAt) {
       return false;
     }
     inv.usedBy = userId;
