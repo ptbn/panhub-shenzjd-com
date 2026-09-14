@@ -40,37 +40,96 @@
           </div>
         </div>
 
-        <!-- 玩法一：网盘类极速转存与芝杜联动面板 -->
-        <div v-if="isCloud" class="z9x-card">
-          <div class="z9x-header">
-            <span class="z9x-badge">📺 芝杜 Z9X 播放流</span>
-            <span class="z9x-tag">4K 原画免下载</span>
-          </div>
-          <div class="z9x-steps">
-            <div class="step-item">
-              <span class="step-num">1</span>
-              <div class="step-text">点击下方<b>「一键转存」</b>，自动复制提取码并直达网盘保存影片；</div>
-            </div>
-            <div class="step-item">
-              <span class="step-num">2</span>
-              <div class="step-text">保存后，片源立即通过 AList 呈现在芝杜 Z9X 海报墙中；</div>
-            </div>
-            <div class="step-item">
-              <span class="step-num">3</span>
-              <div class="step-text">芝杜以 302 原画直链输出杜比视界，<b>零占用 NAS 硬盘与性能</b>。</div>
+        <!-- 玩法一 (方案 A)：网盘类动态挂载与芝杜直出联动面板 -->
+        <div v-if="isCloud" class="cloud-panel">
+          <!-- 门禁 1：未登录提示 -->
+          <div v-if="!isAuthenticated" class="gate-card unauth">
+            <div class="gate-icon">🔒</div>
+            <div class="gate-content">
+              <div class="gate-title">多用户 AList 专属挂载需登录</div>
+              <div class="gate-desc">登录后即可将分享直接挂载到您的专属目录，芝杜 Z9X 免下载 4K 秒播，完全隔离其他用户。</div>
+              <div class="gate-actions">
+                <a href="/auth/login" class="gate-btn primary">立即登录 / 注册</a>
+              </div>
             </div>
           </div>
 
-          <div class="quick-links">
-            <a href="https://alist.taogehome.cloud" target="_blank" class="alist-link">
-              <span>在 AList 媒体库中查看</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <line x1="10" y1="14" x2="21" y2="3"></line>
-              </svg>
-            </a>
+          <!-- 门禁 2：已登录但未配置 AList -->
+          <div v-else-if="!alistConfigured" class="gate-card unconfigured">
+            <div class="gate-icon">⚙️</div>
+            <div class="gate-content">
+              <div class="gate-title">尚未在【我的 NAS】中绑定 AList</div>
+              <div class="gate-desc">请先配置您的 AList 服务地址与 API Token，配置后可一键自动挂载并推送到芝杜海报墙。</div>
+              <div class="gate-actions">
+                <button type="button" class="gate-btn primary" @click="openNasSettings">
+                  前往绑定我的 AList
+                </button>
+              </div>
+            </div>
           </div>
+
+          <!-- 状态 3：已就绪，展示方案 A 挂载面板 -->
+          <template v-else>
+            <!-- 挂载成功展示卡片 -->
+            <div v-if="mountSuccessResult" class="mount-success-card">
+              <div class="success-header">
+                <span class="badge-success">✅ 已成功动态挂载至 AList</span>
+                <span class="driver-name">{{ mountSuccessResult.driver }}</span>
+              </div>
+              <div class="mount-info-row">
+                <span class="info-label">📺 芝杜 Z9X 直播源 (WebDAV)：</span>
+                <div class="copyable-row">
+                  <code class="code-val">{{ mountSuccessResult.webdavUrl }}</code>
+                  <button type="button" class="mini-copy-btn" @click="copyText(mountSuccessResult.webdavUrl)">复制</button>
+                </div>
+              </div>
+              <div v-if="mountSuccessResult.files && mountSuccessResult.files.length > 0" class="files-preview">
+                <div class="files-title">📁 包含影视媒体文件 ({{ mountSuccessResult.files.length }} 个)：</div>
+                <ul class="files-list">
+                  <li v-for="f in mountSuccessResult.files.slice(0, 4)" :key="f.name">
+                    <span class="file-name">{{ f.name }}</span>
+                    <span v-if="f.size" class="file-size">{{ formatBytes(f.size) }}</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="success-actions">
+                <a :href="mountSuccessResult.alistPlayUrl" target="_blank" class="open-alist-btn">
+                  <span>🌐 打开 AList 在线原画播放</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- 挂载前引导卡片 -->
+            <div v-else class="z9x-card">
+              <div class="z9x-header">
+                <span class="z9x-badge">⚡ 方案 A：AList 动态分享挂载</span>
+                <span class="z9x-tag">免转存 · 芝杜秒播</span>
+              </div>
+              <div class="mount-path-preview">
+                <span class="preview-label">专属挂载路径：</span>
+                <code class="preview-path">{{ targetMountPathPreview }}</code>
+              </div>
+              <div class="z9x-steps">
+                <div class="step-item">
+                  <span class="step-num">1</span>
+                  <div class="step-text">点击下方<b>「一键挂载到 AList」</b>，系统自动通过 AList 接口将该分享挂载为只读影视目录；</div>
+                </div>
+                <div class="step-item">
+                  <span class="step-num">2</span>
+                  <div class="step-text"><b>无需转存到个人盘，不占网盘空间</b>，芝杜 Z9X 海报墙直接读取 WebDAV 4K 播放；</div>
+                </div>
+                <div class="step-item">
+                  <span class="step-num">3</span>
+                  <div class="step-text">若遇到特殊链接失效，支持随时使用下方备用通道前往网盘官方转存。</div>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
 
         <!-- 磁力类资源：下载器调度面板 -->
@@ -142,9 +201,33 @@
       <!-- 底部操作栏 -->
       <div class="drawer-footer">
         <button class="cancel-btn" @click="$emit('close')">关闭</button>
-        <button v-if="isCloud" class="push-btn primary-glow" @click="executeCloudTransfer">
-          <span>🚀 复制提取码并前往网盘转存</span>
-        </button>
+
+        <!-- 网盘类资源操作按钮群 -->
+        <template v-if="isCloud">
+          <button
+            v-if="canShareMount && isAuthenticated && alistConfigured"
+            class="push-btn primary-glow"
+            :disabled="mounting"
+            @click="executeMountShare">
+            <span v-if="mounting" class="spinner"></span>
+            <span>{{ mounting ? '正在挂载并同步...' : '⚡ 一键挂载到 AList (芝杜秒播)' }}</span>
+          </button>
+
+          <button
+            v-if="!canShareMount && isAuthenticated && alistConfigured"
+            class="push-btn refresh-btn"
+            :disabled="refreshing"
+            @click="triggerManualRefresh">
+            <span v-if="refreshing" class="spinner"></span>
+            <span>{{ refreshing ? '穿透刷新中...' : '🔄 存入后穿透刷新 AList' }}</span>
+          </button>
+
+          <button class="push-btn secondary-btn" @click="copyAndOpenShare">
+            <span>🌐 打开网盘分享页 (带提取码)</span>
+          </button>
+        </template>
+
+        <!-- 磁力类资源操作按钮 -->
         <button v-else class="push-btn" :disabled="pushing" @click="executePush">
           <span v-if="pushing" class="spinner"></span>
           <span>{{ pushing ? '正在向 NAS 下发指令...' : '📥 立即推送到 NAS' }}</span>
@@ -155,7 +238,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref, reactive, computed, watch } from "vue";
 import { parseResourceMeta } from "~/composables/useResourceParser";
+import { useAuth } from "~/composables/useAuth";
 
 const props = defineProps<{
   visible: boolean;
@@ -163,8 +248,17 @@ const props = defineProps<{
 }>();
 const emit = defineEmits(["close", "success"]);
 
+const { user, isAuthenticated } = useAuth();
+const nasModalVisible = useState<boolean>("nas_modal_visible", () => false);
+
 const pushing = ref(false);
+const mounting = ref(false);
+const refreshing = ref(false);
 const feedback = ref<{ success: boolean; message: string } | null>(null);
+const mountSuccessResult = ref<any>(null);
+
+const alistConfigured = ref(false);
+const userDefaultPath = ref("");
 
 const form = reactive({
   category: "movie" as "movie" | "tv" | "anime" | "other",
@@ -179,6 +273,20 @@ const isCloud = computed(() => {
   );
 });
 
+const canShareMount = computed(() => {
+  const u = (props.item?.url || "").toLowerCase();
+  return /115\.com\/s|pan\.baidu\.com\/s|alipan\.com\/s|aliyundrive\.com\/s|123pan\.com\/s/i.test(u);
+});
+
+const targetMountPathPreview = computed(() => {
+  const base = userDefaultPath.value || `/${user.value?.username || "twisper"}/影视挂载`;
+  const rawTitle = (props.item?.note || props.item?.url || "未知影视")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .trim();
+  const title = rawTitle.slice(0, 30);
+  return `${base.replace(/\/+$/, "")}/${title}`;
+});
+
 const inferredMediaType = computed(() => {
   if (!props.item) return "";
   const meta = parseResourceMeta(props.item.note || props.item.url || "");
@@ -188,11 +296,43 @@ const inferredMediaType = computed(() => {
   return "";
 });
 
+async function checkUserProfile() {
+  if (!isAuthenticated.value) {
+    alistConfigured.value = false;
+    return;
+  }
+  try {
+    const res = await $fetch<{ profile: any }>("/api/nas/profile");
+    if (res.profile && res.profile.alistUrl) {
+      alistConfigured.value = true;
+      userDefaultPath.value =
+        res.profile.alistDefaultPath || `/${user.value?.username || "twisper"}/影视挂载`;
+    } else {
+      alistConfigured.value = false;
+    }
+  } catch {
+    alistConfigured.value = false;
+  }
+}
+
+watch(
+  () => props.visible,
+  (v) => {
+    if (v) {
+      feedback.value = null;
+      mountSuccessResult.value = null;
+      checkUserProfile();
+    }
+  },
+  { immediate: true }
+);
+
 watch(
   () => props.item,
   (newItem) => {
     if (!newItem) return;
     feedback.value = null;
+    mountSuccessResult.value = null;
     const text = `${newItem.note || ""} ${newItem.url || ""}`;
     const meta = parseResourceMeta(text);
 
@@ -227,62 +367,139 @@ function resetDefaultPath() {
   setCategory(form.category);
 }
 
-async function executeCloudTransfer() {
+function openNasSettings() {
+  emit("close");
+  nasModalVisible.value = true;
+}
+
+function copyText(text: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard) {
+    navigator.clipboard.writeText(text);
+    feedback.value = { success: true, message: "地址已成功复制到剪贴板！" };
+  }
+}
+
+function formatBytes(bytes: number) {
+  if (!bytes || bytes <= 0) return "";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+}
+
+/**
+ * 方案 A：一键调用 AList 动态分享挂载 API
+ */
+async function executeMountShare() {
   if (!props.item?.url) return;
+  if (!isAuthenticated.value) {
+    feedback.value = {
+      success: false,
+      message: "请先登录 PanHub 账号，才能使用多用户 AList 专属挂载与芝杜秒播服务！",
+    };
+    return;
+  }
+  if (!alistConfigured.value) {
+    feedback.value = {
+      success: false,
+      message: "您尚未在【我的 NAS】中配置 AList 访问地址与 API Token，请先完成绑定。",
+    };
+    return;
+  }
+
+  mounting.value = true;
   feedback.value = null;
+  mountSuccessResult.value = null;
 
-  // 1. 复制提取码到剪贴板
-  if (props.item.password) {
+  try {
+    const res = await $fetch<any>("/api/nas/mount-share", {
+      method: "POST",
+      body: {
+        url: props.item.url,
+        password: props.item.password,
+        title: props.item.note || props.item.url,
+      },
+    });
+    mountSuccessResult.value = res;
+    feedback.value = {
+      success: true,
+      message: `🎉 已成功动态挂载至 AList：${res.mountPath}，芝杜海报墙与播放器即刻秒播！`,
+    };
+  } catch (err: any) {
+    feedback.value = {
+      success: false,
+      message: err.data?.message || err.message || "AList 挂载失败，请检查 AList 账号权限或分享状态",
+    };
+  } finally {
+    mounting.value = false;
+  }
+}
+
+/**
+ * 备用：复制提取码并在新标签页打开网盘分享页
+ */
+async function copyAndOpenShare() {
+  if (!props.item?.url) return;
+  if (props.item.password && typeof navigator !== "undefined" && navigator.clipboard) {
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(props.item.password);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = props.item.password;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
-    } catch (e) {
-      console.warn("Clipboard copy failed", e);
-    }
+      await navigator.clipboard.writeText(props.item.password);
+    } catch {}
   }
-
-  // 2. 在新标签页唤起网盘分享页
   window.open(props.item.url, "_blank", "noopener,noreferrer");
-
-  // 3. 智能推导 AList 对应网盘路径并自动异步穿透刷新
-  let cloudTargetName = "网盘";
-  let targetPath = "/";
-  const u = (props.item.url || "").toLowerCase();
-  if (u.includes("quark.cn")) {
-    cloudTargetName = "夸克网盘";
-    targetPath = "/夸克";
-  } else if (u.includes("115.com")) {
-    cloudTargetName = "115网盘";
-    targetPath = "/115网盘";
-  } else if (u.includes("baidu.com")) {
-    cloudTargetName = "百度网盘";
-    targetPath = "/百度网盘";
-  } else if (u.includes("xunlei.com")) {
-    cloudTargetName = "迅雷网盘";
-    targetPath = "/迅雷网盘";
-  }
-
-  // 触发后台 AList 穿透刷新（异步静默执行，不阻断主流程）
-  $fetch("/api/nas/refresh", {
-    method: "POST",
-    body: { path: targetPath },
-  }).catch(() => {});
-
-  // 4. 给出清晰的芝杜联动反馈
   feedback.value = {
     success: true,
     message: props.item.password
-      ? `提取码 [${props.item.password}] 已自动复制！${cloudTargetName}页面已打开。AList [${targetPath}] 目录缓存已自动穿透刷新，存入后芝杜 Z9X 即刻秒播！`
-      : `${cloudTargetName}分享页面已打开。AList [${targetPath}] 目录缓存已自动穿透刷新，存入后芝杜 Z9X 即刻秒播！`,
+      ? `提取码 [${props.item.password}] 已自动复制！网盘分享页面已在新标签页打开。`
+      : "网盘分享页面已在新标签页打开。",
   };
+}
+
+/**
+ * 真实穿透刷新对应 AList 目录缓存
+ */
+async function triggerManualRefresh() {
+  if (!isAuthenticated.value) {
+    feedback.value = {
+      success: false,
+      message: "请先登录 PanHub 账号后执行穿透刷新。",
+    };
+    return;
+  }
+  if (!alistConfigured.value) {
+    feedback.value = {
+      success: false,
+      message: "尚未配置 AList，无法执行目录穿透刷新，请先在【我的 NAS】中绑定 AList。",
+    };
+    return;
+  }
+
+  refreshing.value = true;
+  feedback.value = null;
+
+  let path = "/";
+  const u = (props.item?.url || "").toLowerCase();
+  if (u.includes("quark.cn")) path = "/夸克";
+  else if (u.includes("115.com")) path = "/115网盘";
+  else if (u.includes("baidu.com")) path = "/百度网盘";
+  else if (u.includes("xunlei.com")) path = "/迅雷网盘";
+
+  try {
+    const res = await $fetch<any>("/api/nas/refresh", {
+      method: "POST",
+      body: { path },
+    });
+    feedback.value = {
+      success: true,
+      message: `✅ AList 目录 [${path}] 缓存已成功穿透刷新，芝杜海报墙已同步最新文件！`,
+    };
+  } catch (e: any) {
+    feedback.value = {
+      success: false,
+      message: e.data?.message || "刷新 AList 目录失败，请检查 AList 状态",
+    };
+  } finally {
+    refreshing.value = false;
+  }
 }
 
 async function executePush() {
@@ -709,5 +926,231 @@ async function executePush() {
 
 .alist-link:hover {
   color: #34d399;
+}
+
+.gate-card {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.gate-card.unconfigured {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.gate-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.gate-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.gate-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f3f4f6;
+}
+
+.gate-desc {
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+.gate-actions {
+  margin-top: 8px;
+}
+
+.gate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  background: #3b82f6;
+  color: #fff;
+  transition: opacity 0.2s;
+}
+
+.gate-btn:hover {
+  opacity: 0.9;
+}
+
+.mount-path-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.preview-label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.preview-path {
+  font-size: 11px;
+  color: #34d399;
+  font-family: monospace;
+}
+
+.mount-success-card {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.success-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge-success {
+  font-size: 13px;
+  font-weight: 700;
+  color: #34d399;
+}
+
+.driver-name {
+  font-size: 11px;
+  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.mount-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.copyable-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.code-val {
+  font-size: 11px;
+  color: #6ee7b7;
+  font-family: monospace;
+  word-break: break-all;
+  flex: 1;
+}
+
+.mini-copy-btn {
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.files-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.files-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.files-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.files-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  color: #9ca3af;
+  font-family: monospace;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.success-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.open-alist-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-size: 12px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #d1d5db !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.refresh-btn {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
 }
 </style>

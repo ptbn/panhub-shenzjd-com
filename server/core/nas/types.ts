@@ -34,3 +34,20 @@ export interface NasProfilePublic {
   torrentDefaultDir: string;
   updatedAt: number;
 }
+
+export interface MountedMediaFile {
+  name: string;
+  size: number;
+  isDir: boolean;
+}
+
+export interface ShareMountResult {
+  success: boolean;
+  message: string;
+  storageId?: number;
+  driver?: string;
+  mountPath?: string;
+  webdavUrl?: string;
+  alistPlayUrl?: string;
+  files?: MountedMediaFile[];
+}

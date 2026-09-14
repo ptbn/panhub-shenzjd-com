@@ -28,11 +28,20 @@
         <!-- AList 网盘驱动配置 -->
         <div class="section-group">
           <div class="flex-between">
-            <h3 class="section-title">☁️ AList 网盘转存驱动</h3>
-            <label class="toggle-label">
-              <input v-model="form.cloudDriveEnabled" type="checkbox" />
-              <span>启用</span>
-            </label>
+            <h3 class="section-title">☁️ AList 网盘中枢与动态挂载驱动</h3>
+            <div class="header-right-actions">
+              <button
+                type="button"
+                class="quick-preset-btn"
+                @click="quickFillTaogeAlist"
+                title="一键填入家庭推荐的 AList 服务地址与凭据">
+                ⚡ 填入家庭 AList 预设
+              </button>
+              <label class="toggle-label">
+                <input v-model="form.cloudDriveEnabled" type="checkbox" />
+                <span>启用</span>
+              </label>
+            </div>
           </div>
           <div v-if="form.cloudDriveEnabled" class="form-grid">
             <div class="form-item col-span-2">
@@ -44,20 +53,21 @@
                 placeholder="https://alist.taogehome.cloud" />
             </div>
             <div class="form-item">
-              <label>AList API Token {{ form.alistHasToken ? '(已保存密文)' : '' }}</label>
+              <label>AList API Token {{ form.alistHasToken ? '(已加密持久化)' : '' }}</label>
               <input
                 v-model="form.alistToken"
                 type="password"
                 class="input-field"
-                :placeholder="form.alistHasToken ? '****** (留空保持原配置)' : '输入 AList 个人令牌'" />
+                :placeholder="form.alistHasToken ? '****** (留空保持原配置)' : '输入 AList API Token'" />
             </div>
             <div class="form-item">
-              <label>默认转存落盘目录</label>
+              <label>用户专属挂载根目录 (多用户隔离)</label>
               <input
                 v-model="form.alistDefaultPath"
                 type="text"
                 class="input-field"
-                placeholder="/我的网盘/电影" />
+                placeholder="/我的影视挂载" />
+              <p class="field-hint">影视动态挂载点将创建在此目录下，各账号天然隔离。</p>
             </div>
             <div class="col-span-2">
               <button
@@ -281,6 +291,18 @@ watch(
   },
   { immediate: true }
 );
+
+function quickFillTaogeAlist() {
+  form.alistUrl = "https://alist.taogehome.cloud";
+  form.alistToken = "alist-871d2cbe-8d73-4996-8b6e-243d4c68868eSEanz0h5BaIf9RqZ3HqxIXoe5pW6eJzP38pWZGSxp8plF9xZNyCHPZPzG8jlECTP";
+  if (!form.alistDefaultPath) {
+    form.alistDefaultPath = "/我的影视挂载";
+  }
+  testFeedback.value = {
+    success: true,
+    message: "已一键填入家庭 AList 预设配置，请点击【测试 AList 连通性】验证或直接保存。",
+  };
+}
 
 async function testAlist() {
   testingAlist.value = true;
@@ -790,5 +812,35 @@ function copyText(text: string) {
 .chip-driver {
   color: #9ca3af;
   font-size: 10px;
+}
+
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quick-preset-btn {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-preset-btn:hover {
+  background: rgba(16, 185, 129, 0.25);
+  color: #fff;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 4px 0 0;
+  line-height: 1.4;
 }
 </style>

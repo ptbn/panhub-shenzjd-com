@@ -230,7 +230,7 @@ const { user, isAdmin, logout } = useAuth();
 
 const currentNav = ref("home");
 const mobileMenuOpen = ref(false);
-const nasModalVisible = ref(false);
+const nasModalVisible = useState<boolean>("nas_modal_visible", () => false);
 const userMenuOpen = ref(false);
 
 async function handleLogout() {
