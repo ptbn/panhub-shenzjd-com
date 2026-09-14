@@ -3,7 +3,7 @@ import { getMemoryDatabase } from "../../server/core/db/index";
 import { MemoryDatabaseAdapter } from "../../server/core/db/memoryAdapter";
 import { registerUser, loginUser } from "../../server/core/services/authService";
 import { createInviteCode, revokeInviteCode, listAllInvites } from "../../server/core/services/inviteService";
-import { encryptCredential, decryptCredential } from "../../server/core/db/crypto";
+import { encryptCredential, decryptCredential, generateSalt, hashPassword } from "../../server/core/db/crypto";
 import { dispatchPushTask } from "../../server/core/nas/dispatcher";
 
 describe("Admin & NAS Profile 业务层综合测试", () => {
@@ -149,5 +149,24 @@ describe("Admin & NAS Profile 业务层综合测试", () => {
     const updatedInvites = await isolateB.listInvites();
     const targetInv = updatedInvites.find((i) => i.code === inv.code);
     expect(targetInv?.usedBy).toBe(newUser.user.id);
+  });
+
+  it("超级管理员直接创建与录入用户 (免邀请码直接开通)", async () => {
+    const salt = generateSalt(16);
+    const hash = await hashPassword("DirectPassword123", salt);
+    const directUser = await db.createUser({
+      id: "u_direct_01",
+      email: "direct@taogehome.cloud",
+      username: "DirectUser",
+      passwordHash: hash,
+      passwordSalt: salt,
+      role: "user",
+      status: "active",
+    });
+    expect(directUser.email).toBe("direct@taogehome.cloud");
+    const found = await db.getUserByEmail("direct@taogehome.cloud");
+    expect(found?.username).toBe("DirectUser");
+    const allUsers = await db.listUsers();
+    expect(allUsers.some((u) => u.email === "direct@taogehome.cloud")).toBe(true);
   });
 });

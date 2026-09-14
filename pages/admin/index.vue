@@ -59,6 +59,12 @@
 
     <!-- TAB 1: 用户管理 -->
     <div v-if="activeTab === 'users'" class="tab-content">
+      <div class="toolbar">
+        <button class="primary-btn" @click="showAddUserModal = true">
+          + 录入 / 直接添加新用户
+        </button>
+      </div>
+
       <div class="card-panel">
         <div class="table-responsive">
           <table class="data-table">
@@ -253,6 +259,63 @@
       </div>
     </div>
 
+    <!-- 直接创建/录入用户弹窗 -->
+    <div v-if="showAddUserModal" class="modal-overlay" @click.self="showAddUserModal = false">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">快速录入 / 添加新用户</h3>
+          <button class="modal-close" @click="showAddUserModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">
+            管理员可直接录入或创建用户账号，无需填写邀请码。录入后用户可立即使用账号密码登录，数据将在本地与服务端双向固化。
+          </p>
+          <div class="mb-4">
+            <label class="block text-xs font-medium text-gray-300 mb-1">登录邮箱 *</label>
+            <input
+              v-model="newUserForm.email"
+              type="email"
+              class="w-full p-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm outline-none focus:border-emerald-500"
+              placeholder="例如: friend@example.com" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs font-medium text-gray-300 mb-1">用户名 *</label>
+            <input
+              v-model="newUserForm.username"
+              type="text"
+              class="w-full p-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm outline-none focus:border-emerald-500"
+              placeholder="例如: 家庭成员" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs font-medium text-gray-300 mb-1">登录密码 (留空自动生成)</label>
+            <input
+              v-model="newUserForm.password"
+              type="text"
+              class="w-full p-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm outline-none focus:border-emerald-500 font-mono"
+              placeholder="至少 6 位字符，留空则随机生成" />
+          </div>
+          <div class="mb-5">
+            <label class="block text-xs font-medium text-gray-300 mb-1">用户角色</label>
+            <select
+              v-model="newUserForm.role"
+              class="w-full p-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm outline-none focus:border-emerald-500">
+              <option value="user">普通用户</option>
+              <option value="admin">超级管理员</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer flex items-center justify-end gap-3">
+          <button class="secondary-btn" @click="showAddUserModal = false">取消</button>
+          <button
+            class="primary-btn"
+            :disabled="submittingUser"
+            @click="submitCreateUser">
+            {{ submittingUser ? '正在创建...' : '立即确认创建' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- D1 数据库绑定指导弹窗 -->
     <div v-if="showD1Modal" class="modal-overlay" @click.self="showD1Modal = false">
       <div class="modal-card">
@@ -302,6 +365,14 @@ const broadcastEnabled = ref(true);
 const toastMessage = ref("");
 const storageType = ref<"d1" | "memory">("memory");
 const showD1Modal = ref(false);
+const showAddUserModal = ref(false);
+const submittingUser = ref(false);
+const newUserForm = reactive({
+  email: "",
+  username: "",
+  password: "",
+  role: "user" as "user" | "admin",
+});
 
 const STORAGE_KEY_INVITES = "panhub_admin_invites_v1";
 const STORAGE_KEY_USERS = "panhub_admin_users_v1";
@@ -459,6 +530,37 @@ async function resetUserPassword(userId: string) {
     await loadData();
   } catch (err: any) {
     showToast(err.data?.message || err.message || "重置密码失败");
+  }
+}
+
+async function submitCreateUser() {
+  if (!newUserForm.email.trim() || !newUserForm.username.trim()) {
+    showToast("请填写完整的邮箱与用户名");
+    return;
+  }
+  submittingUser.value = true;
+  try {
+    const res = await $fetch<{ success: boolean; user: any; password: string }>("/api/admin/users", {
+      method: "POST",
+      body: newUserForm,
+    });
+    showToast(`成功创建用户 ${res.user.username}！`);
+    users.value = mergeUsers(users.value, [res.user]);
+    if (import.meta.client) {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users.value));
+    }
+    showAddUserModal.value = false;
+    const credInfo = `用户创建/录入成功！\n\n邮箱: ${res.user.email}\n密码: ${res.password}\n\n请保存此凭据以供用户登录。`;
+    newUserForm.email = "";
+    newUserForm.username = "";
+    newUserForm.password = "";
+    newUserForm.role = "user";
+    alert(credInfo);
+    await loadData();
+  } catch (err: any) {
+    showToast(err.data?.message || err.message || "创建用户失败");
+  } finally {
+    submittingUser.value = false;
   }
 }
 
