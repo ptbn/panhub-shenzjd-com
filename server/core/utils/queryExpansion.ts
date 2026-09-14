@@ -43,7 +43,9 @@ export async function resolveEnglishTitle(keyword: string): Promise<ExpandedMeta
         "user-agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       },
-      timeout: 2500,
+      timeout: 3500,
+      retry: 2,
+      retryDelay: 300,
     });
 
     if (Array.isArray(data) && data.length > 0) {

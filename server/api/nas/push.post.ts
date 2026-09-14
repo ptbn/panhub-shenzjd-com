@@ -40,8 +40,15 @@ export default defineEventHandler(async (event) => {
       user.username
     );
 
+    if (!result.success) {
+      throw createError({
+        statusCode: 502,
+        message: result.message || "NAS 下载器拒绝了推送请求，请检查 AList Token 与连接配置",
+      });
+    }
     return result;
   } catch (err: any) {
+    if ((err as any).statusCode) throw err; // re-throw createError instances
     throw createError({
       statusCode: 500,
       message: err.message || "NAS 推送失败",

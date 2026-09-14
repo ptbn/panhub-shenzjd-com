@@ -1,88 +1,120 @@
 <template>
-  <Transition name="sticky-slide">
-    <div v-show="active" class="compact-sticky-bar" data-theme-part="compact-sticky">
-      <div class="sticky-container">
-        <!-- 左侧：紧凑搜索胶囊 -->
-        <div class="compact-search-box">
-          <div class="search-mini-icon">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
+  <Transition name="island-spring">
+    <aside
+      v-show="active"
+      class="compact-floating-island"
+      :class="{ 'is-expanded': isSearchExpanded }"
+      role="toolbar"
+      aria-label="快捷筛选与检索灵动胶囊"
+      data-theme-part="compact-island">
+      <div class="island-body">
+        <!-- 默认模式：平台横向筛选胶囊组 -->
+        <Transition name="fade-morph" mode="out-in">
+          <div v-if="!isSearchExpanded" key="pills-mode" class="island-pills-bar">
+            <!-- 平台胶囊容器 -->
+            <div class="pills-scroller" ref="scrollerRef">
+              <button
+                type="button"
+                class="island-pill"
+                :class="{ active: currentPlatform === 'all' }"
+                @click="$emit('update:platform', 'all'); $emit('scrollToAnchor')">
+                <span class="pill-title">全部</span>
+                <span class="pill-badge">{{ searchStateTotal }}</span>
+              </button>
+              <button
+                v-for="p in platformList"
+                :key="p.key"
+                type="button"
+                class="island-pill"
+                :class="{
+                  active: currentPlatform === p.key,
+                  'pill-magnet': p.key === 'magnet'
+                }"
+                @click="$emit('update:platform', p.key); $emit('scrollToAnchor')">
+                <span class="pill-title">{{ p.name }}</span>
+                <span class="pill-badge">{{ p.count }}</span>
+              </button>
+            </div>
+
+            <!-- 分割微线 -->
+            <div class="island-divider" aria-hidden="true" />
+
+            <!-- 展开搜索微按钮 -->
+            <button
+              type="button"
+              class="island-action-btn search-trigger-btn"
+              title="展开搜索"
+              aria-label="展开搜索框"
+              @click="openSearch">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+              <span v-if="kw" class="trigger-kw-preview">{{ kw }}</span>
+            </button>
           </div>
-          <input
-            :value="kw"
-            class="compact-input"
-            placeholder="搜索影视/网盘/磁力…"
-            @input="$emit('update:kw', ($event.target as HTMLInputElement).value)"
-            @keyup.enter="$emit('search')" />
-          <button
-            v-if="kw"
-            type="button"
-            class="compact-clear-btn"
-            title="清空"
-            @click="$emit('update:kw', ''); $emit('search')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="compact-submit-btn"
-            title="执行搜索"
-            @click="$emit('search')">
-            搜全网
-          </button>
-        </div>
 
-        <!-- 中间：平台筛选快捷胶囊 -->
-        <div class="compact-platform-pills">
-          <button
-            type="button"
-            class="sticky-pill"
-            :class="{ active: currentPlatform === 'all' }"
-            @click="$emit('update:platform', 'all')">
-            全部 ({{ searchStateTotal }})
-          </button>
-          <button
-            v-for="p in platformList"
-            :key="p.key"
-            type="button"
-            class="sticky-pill"
-            :class="{
-              active: currentPlatform === p.key,
-              'pill-magnet': p.key === 'magnet'
-            }"
-            @click="$emit('update:platform', p.key)">
-            <span>{{ p.name }}</span>
-            <span class="sticky-pill-count">({{ p.count }})</span>
-          </button>
-        </div>
+          <!-- 搜索展开模式：平滑形变出的输入舱 -->
+          <div v-else key="search-mode" class="island-search-bar">
+            <div class="search-input-wrap">
+              <div class="input-icon" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+              </div>
+              <input
+                ref="inputRef"
+                :value="kw"
+                class="island-input"
+                placeholder="搜索影视 / 网盘 / 磁力…"
+                @input="$emit('update:kw', ($event.target as HTMLInputElement).value)"
+                @keyup.enter="handleEnterSearch"
+                @keyup.esc="closeSearch" />
+              <button
+                v-if="kw"
+                type="button"
+                class="input-clear-btn"
+                title="清空搜索词"
+                @click="$emit('update:kw', ''); focusInput()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
 
-        <!-- 右侧：状态与快捷定位 -->
-        <div class="compact-right-meta">
-          <span class="filtered-badge">
-            已筛出 <strong>{{ totalFilteredCount }}</strong> 条
-          </span>
-          <button
-            type="button"
-            class="anchor-scroll-btn"
-            title="定位到结果区顶部"
-            @click="$emit('scrollToAnchor')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="12" y1="19" x2="12" y2="5" />
-              <polyline points="5 12 12 5 19 12" />
-            </svg>
-            <span>回顶部</span>
-          </button>
-        </div>
+            <!-- 执行搜索按钮 -->
+            <button
+              type="button"
+              class="island-submit-btn"
+              title="搜索"
+              @click="handleEnterSearch">
+              搜索
+            </button>
+
+            <!-- 收起折叠按钮 -->
+            <button
+              type="button"
+              class="island-collapse-btn"
+              title="收起搜索框"
+              aria-label="收起搜索框"
+              @click="closeSearch">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </Transition>
       </div>
-    </div>
+    </aside>
   </Transition>
 </template>
 
 <script setup lang="ts">
+import { ref, nextTick } from "vue";
+
 defineProps<{
   active: boolean;
   kw: string;
@@ -94,67 +126,222 @@ defineProps<{
   currentPlatform: string;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:kw", val: string): void;
   (e: "update:platform", val: string): void;
   (e: "search"): void;
   (e: "scrollToAnchor"): void;
 }>();
+
+const isSearchExpanded = ref(false);
+const inputRef = ref<HTMLInputElement | null>(null);
+const scrollerRef = ref<HTMLElement | null>(null);
+
+function openSearch() {
+  isSearchExpanded.value = true;
+  nextTick(() => {
+    inputRef.value?.focus();
+  });
+}
+
+function closeSearch() {
+  isSearchExpanded.value = false;
+}
+
+function focusInput() {
+  nextTick(() => {
+    inputRef.value?.focus();
+  });
+}
+
+function handleEnterSearch() {
+  emit("search");
+  isSearchExpanded.value = false;
+}
 </script>
 
 <style scoped>
-.compact-sticky-bar {
+/* 居中灵动悬浮胶囊岛主容器 (Apple/Linear Glassmorphism) */
+.compact-floating-island {
   position: fixed;
-  top: 60px;
-  left: 0;
-  right: 0;
-  z-index: 45;
-  background: var(--bg-glass-strong, rgba(13, 17, 23, 0.94));
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 55;
+  width: min(740px, calc(100% - 48px));
+  background: var(--bg-glass-strong, rgba(13, 17, 23, 0.88));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border-glass, rgba(255, 255, 255, 0.12));
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
-  padding: 8px 0;
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.14));
+  border-radius: 9999px;
+  box-shadow: 0 10px 32px -4px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 20px -2px rgba(16, 185, 129, 0.08);
+  padding: 5px 8px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
-.sticky-container {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 24px;
+.compact-floating-island:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 14px 40px -4px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(16, 185, 129, 0.16);
+}
+
+.island-body {
+  width: 100%;
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
 }
 
-/* 紧凑搜索框 */
-.compact-search-box {
+/* 平台标签筛选态 */
+.island-pills-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pills-scroller {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 1px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pills-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.island-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--bg-surface, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.09));
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.island-pill:hover {
+  color: var(--text-primary, #ffffff);
+  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.12));
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.island-pill.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-color: #10b981;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);
+}
+
+.island-pill.pill-magnet.active {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+}
+
+.pill-title {
+  line-height: 1;
+}
+
+.pill-badge {
+  font-size: 10px;
+  opacity: 0.85;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1px 5px;
+  border-radius: 9999px;
+}
+
+/* 分割线 */
+.island-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-glass, rgba(255, 255, 255, 0.12));
+  flex-shrink: 0;
+}
+
+/* 搜索展开触发按钮 */
+.island-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  background: var(--bg-surface, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.12));
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+}
+
+.island-action-btn:hover {
+  color: var(--primary, #10b981);
+  border-color: var(--primary, #10b981);
+  background: rgba(16, 185, 129, 0.12);
+  transform: translateY(-1px);
+}
+
+.trigger-kw-preview {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-primary, #ffffff);
+}
+
+/* 搜索模式：展开输入舱 */
+.island-search-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: barSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.search-input-wrap {
+  flex: 1;
   display: flex;
   align-items: center;
   background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.08));
   border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.18));
   border-radius: 9999px;
-  padding: 2px 4px 2px 12px;
-  height: 38px;
-  min-width: 260px;
-  max-width: 320px;
+  padding: 2px 8px 2px 12px;
+  height: 34px;
   transition: all 0.2s ease;
 }
 
-.compact-search-box:focus-within {
+.search-input-wrap:focus-within {
   border-color: var(--primary, #10b981);
-  box-shadow: 0 0 0 2px var(--primary-glow, rgba(16, 185, 129, 0.2));
-  background: var(--bg-primary, #0d1117);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
 }
 
-.search-mini-icon {
+.input-icon {
   color: var(--text-tertiary, #94a3b8);
   display: flex;
   align-items: center;
-  margin-right: 8px;
+  margin-right: 6px;
 }
 
-.compact-input {
+.island-input {
   flex: 1;
   background: transparent;
   border: none;
@@ -164,7 +351,7 @@ defineEmits<{
   min-width: 0;
 }
 
-.compact-clear-btn {
+.input-clear-btn {
   background: transparent;
   border: none;
   color: var(--text-tertiary, #94a3b8);
@@ -175,12 +362,12 @@ defineEmits<{
   border-radius: 50%;
 }
 
-.compact-clear-btn:hover {
+.input-clear-btn:hover {
   color: var(--text-primary, #ffffff);
 }
 
-.compact-submit-btn {
-  padding: 4px 12px;
+.island-submit-btn {
+  padding: 5px 14px;
   border-radius: 9999px;
   background: var(--primary, #10b981);
   color: #ffffff;
@@ -189,130 +376,88 @@ defineEmits<{
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.15s ease;
 }
 
-.compact-submit-btn:hover {
-  opacity: 0.9;
+.island-submit-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
 }
 
-/* 平台标签胶囊滚动条 */
-.compact-platform-pills {
+.island-collapse-btn {
+  background: transparent;
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.12));
+  color: var(--text-tertiary, #94a3b8);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  overflow-x: auto;
-  flex: 1;
-  padding: 2px 0;
-  scrollbar-width: none;
-}
-
-.compact-platform-pills::-webkit-scrollbar {
-  display: none;
-}
-
-.sticky-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 12px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  background: var(--bg-surface, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
-  color: var(--text-secondary, #94a3b8);
+  justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
   transition: all 0.18s ease;
 }
 
-.sticky-pill:hover {
+.island-collapse-btn:hover {
   color: var(--text-primary, #ffffff);
-  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.1));
-}
-
-.sticky-pill.active {
-  color: #ffffff;
-  background: var(--primary, #10b981);
-  border-color: var(--primary, #10b981);
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-}
-
-.sticky-pill.pill-magnet.active {
-  background: #10b981;
-}
-
-.sticky-pill-count {
-  font-size: 11px;
-  opacity: 0.85;
-}
-
-/* 右侧元数据 */
-.compact-right-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  white-space: nowrap;
-}
-
-.filtered-badge {
-  font-size: 12px;
-  color: var(--text-secondary, #94a3b8);
-  background: var(--bg-surface, rgba(255, 255, 255, 0.06));
-  padding: 4px 10px;
-  border-radius: 9999px;
-  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
-}
-
-.filtered-badge strong {
-  color: var(--primary, #10b981);
-}
-
-.anchor-scroll-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 12px;
-  border-radius: 8px;
-  background: var(--bg-btn, rgba(255, 255, 255, 0.06));
-  border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.15));
-  color: var(--text-primary, #ffffff);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.anchor-scroll-btn:hover {
-  background: var(--bg-btn-hover, rgba(255, 255, 255, 0.12));
-  border-color: var(--primary, #10b981);
-  color: var(--primary, #10b981);
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* 动效 */
-.sticky-slide-enter-active,
-.sticky-slide-leave-active {
-  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+.island-spring-enter-active,
+.island-spring-leave-active {
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease;
 }
 
-.sticky-slide-enter-from,
-.sticky-slide-leave-to {
-  transform: translateY(-100%);
+.island-spring-enter-from,
+.island-spring-leave-to {
+  transform: translate(-50%, -18px) scale(0.96);
   opacity: 0;
 }
 
-@media (max-width: 900px) {
-  .compact-search-box {
-    min-width: 180px;
-    max-width: 220px;
+.fade-morph-enter-active,
+.fade-morph-leave-active {
+  transition: opacity 0.16s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fade-morph-enter-from {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+.fade-morph-leave-to {
+  opacity: 0;
+  transform: scale(1.02);
+}
+
+@keyframes barSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
   }
-  .filtered-badge {
-    display: none;
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
-  .sticky-container {
-    padding: 0 14px;
-    gap: 10px;
+}
+
+/* 移动端与窄屏适配：智能下沉至底部，单手顺手触达，绝不遮挡上方视野 */
+@media (max-width: 768px) {
+  .compact-floating-island {
+    top: auto;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: calc(100% - 32px);
+    max-width: 480px;
+    padding: 4px 6px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .island-spring-enter-from,
+  .island-spring-leave-to {
+    transform: translate(-50%, 24px) scale(0.95);
+    opacity: 0;
   }
 }
 </style>

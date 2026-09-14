@@ -11,6 +11,7 @@ import {
   verifySessionToken,
   verifySignedInviteCode,
 } from "../db/crypto";
+import { syncEdgeUserRecord, getEdgeUserByEmail } from "../db/edgeRegistry";
 
 export interface RegisterDto {
   email: string;
@@ -44,31 +45,11 @@ export function toPublicUser(u: UserRecord): UserPublic {
 }
 
 async function syncEdgeUser(user: UserRecord): Promise<void> {
-  const cache = (globalThis as any).caches?.default;
-  if (!cache) return;
-  try {
-    const url = `https://panhub-internal.local/users/${encodeURIComponent(user.email.toLowerCase().trim())}`;
-    const res = new Response(JSON.stringify(user), {
-      headers: {
-        "content-type": "application/json",
-        "cache-control": "public, max-age=2592000, s-maxage=2592000",
-      },
-    });
-    await cache.put(new Request(url), res);
-  } catch {}
+  await syncEdgeUserRecord(user).catch(() => {});
 }
 
 async function findEdgeUser(email: string): Promise<UserRecord | null> {
-  const cache = (globalThis as any).caches?.default;
-  if (!cache) return null;
-  try {
-    const url = `https://panhub-internal.local/users/${encodeURIComponent(email.toLowerCase().trim())}`;
-    const res = await cache.match(new Request(url));
-    if (!res) return null;
-    return (await res.json()) as UserRecord;
-  } catch {
-    return null;
-  }
+  return await getEdgeUserByEmail(email).catch(() => null);
 }
 
 export async function isBootstrapMode(db: DatabaseAdapter): Promise<boolean> {

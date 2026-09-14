@@ -12,6 +12,15 @@ import type {
   UserStatus,
   UserRole,
 } from "./types";
+import {
+  syncEdgeUserRecord,
+  getEdgeUserByEmail,
+  getEdgeUsersList,
+  syncEdgeInviteRecord,
+  getEdgeInviteByCode,
+  getEdgeInvitesList,
+  resetEdgeRegistry,
+} from "./edgeRegistry";
 
 export const DEFAULT_ADMIN_USER: UserRecord = {
   id: "u_admin_twisper",
@@ -65,6 +74,7 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
       lastActiveAt: now,
     };
     this.users.set(user.id, user);
+    syncEdgeUserRecord(user).catch(() => {});
     return { ...user };
   }
 
@@ -72,6 +82,7 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
     const user = this.users.get(id);
     if (!user) return false;
     user.status = status;
+    syncEdgeUserRecord(user).catch(() => {});
     return true;
   }
 
@@ -80,6 +91,7 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
     if (!user) return false;
     user.passwordHash = passwordHash;
     user.passwordSalt = passwordSalt;
+    syncEdgeUserRecord(user).catch(() => {});
     return true;
   }
 
@@ -94,6 +106,7 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
     const user = this.users.get(id);
     if (!user) return false;
     user.role = role;
+    syncEdgeUserRecord(user).catch(() => {});
     return true;
   }
 
@@ -105,7 +118,16 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
   }
 
   async listUsers(): Promise<UserRecord[]> {
-    return Array.from(this.users.values()).map((u) => ({ ...u }));
+    const list = Array.from(this.users.values()).map((u) => ({ ...u }));
+    const edgeList = await getEdgeUsersList().catch(() => []);
+    const map = new Map<string, UserRecord>();
+    for (const u of edgeList) {
+      map.set(u.id, u);
+    }
+    for (const u of list) {
+      map.set(u.id, u);
+    }
+    return Array.from(map.values()).map((u) => ({ ...u }));
   }
 
   async countUsers(): Promise<number> {
@@ -166,16 +188,26 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
       expiresAt: finalExpiresAt,
     };
     this.invites.set(invite.code, invite);
+    syncEdgeInviteRecord(invite).catch(() => {});
     return { ...invite };
   }
 
   async getInvite(code: string): Promise<InviteRecord | null> {
-    const inv = this.invites.get(code.toUpperCase().trim());
+    const upper = code.toUpperCase().trim();
+    const inv = this.invites.get(upper);
     return inv ? { ...inv } : null;
   }
 
   async useInvite(code: string, userId: string): Promise<boolean> {
-    const inv = this.invites.get(code.toUpperCase().trim());
+    const upper = code.toUpperCase().trim();
+    let inv = this.invites.get(upper);
+    if (!inv) {
+      const edge = await getEdgeInviteByCode(upper).catch(() => null);
+      if (edge) {
+        inv = edge;
+        this.invites.set(upper, inv);
+      }
+    }
     if (!inv || inv.isRevoked || inv.usedBy) {
       return false;
     }
@@ -184,18 +216,37 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
     }
     inv.usedBy = userId;
     inv.usedAt = Date.now();
+    syncEdgeInviteRecord(inv).catch(() => {});
     return true;
   }
 
   async revokeInvite(code: string): Promise<boolean> {
-    const inv = this.invites.get(code.toUpperCase().trim());
+    const upper = code.toUpperCase().trim();
+    let inv = this.invites.get(upper);
+    if (!inv) {
+      const edge = await getEdgeInviteByCode(upper).catch(() => null);
+      if (edge) {
+        inv = edge;
+        this.invites.set(upper, inv);
+      }
+    }
     if (!inv) return false;
     inv.isRevoked = 1;
+    syncEdgeInviteRecord(inv).catch(() => {});
     return true;
   }
 
   async listInvites(): Promise<InviteRecord[]> {
-    return Array.from(this.invites.values()).sort((a, b) => b.createdAt - a.createdAt);
+    const list = Array.from(this.invites.values());
+    const edgeList = await getEdgeInvitesList().catch(() => []);
+    const map = new Map<string, InviteRecord>();
+    for (const inv of edgeList) {
+      map.set(inv.code.toUpperCase().trim(), inv);
+    }
+    for (const inv of list) {
+      map.set(inv.code.toUpperCase().trim(), inv);
+    }
+    return Array.from(map.values()).sort((a, b) => b.createdAt - a.createdAt);
   }
 
   // NAS Profiles
@@ -265,5 +316,6 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
     this.nasProfiles.clear();
     this.pushLogs = [];
     this.announcement = null;
+    resetEdgeRegistry();
   }
 }

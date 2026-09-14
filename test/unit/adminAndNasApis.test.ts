@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getMemoryDatabase } from "../../server/core/db/index";
+import { MemoryDatabaseAdapter } from "../../server/core/db/memoryAdapter";
 import { registerUser, loginUser } from "../../server/core/services/authService";
 import { createInviteCode, revokeInviteCode, listAllInvites } from "../../server/core/services/inviteService";
 import { encryptCredential, decryptCredential } from "../../server/core/db/crypto";
@@ -115,5 +116,38 @@ describe("Admin & NAS Profile 业务层综合测试", () => {
     const ann = await db.getAnnouncement();
     expect(ann?.enabled).toBe(1);
     expect(ann?.content).toContain("家庭宽带升级维护");
+  });
+
+  it("管理后台跨节点刷新与双向邀请码/用户同步机制 (Edge & Client Rehydration)", async () => {
+    // 1. Isolate A 中管理员生成加密邀请码
+    const admin = await registerUser(
+      { email: "super@taogehome.cloud", username: "SuperAdmin", password: "Password123" },
+      db
+    );
+    const inv = await createInviteCode(admin.user.id, db);
+    expect(inv.code).toHaveLength(8);
+
+    // 2. 模拟前端客户端保存了该邀请码镜像
+    const clientKnownInvites = [inv];
+
+    // 3. 模拟进入全新的 Cloudflare Isolate B (纯冷启动内存实例)
+    const isolateB = new MemoryDatabaseAdapter();
+    await isolateB.init();
+
+    // 此时 Isolate B 中邀请码未丢失，能从 Edge Registry 自动聚合
+    const listBeforeSync = await isolateB.listInvites();
+    expect(listBeforeSync.some((i) => i.code === inv.code)).toBe(true);
+
+    // 4. 新用户在 Isolate B 凭邀请码注册成功
+    const newUser = await registerUser(
+      { email: "friend@taogehome.cloud", username: "Friend", password: "Password123", inviteCode: inv.code },
+      isolateB
+    );
+    expect(newUser.user.email).toBe("friend@taogehome.cloud");
+
+    // 5. 验证已核销状态同步回 Isolate B 的邀请码列表中
+    const updatedInvites = await isolateB.listInvites();
+    const targetInv = updatedInvites.find((i) => i.code === inv.code);
+    expect(targetInv?.usedBy).toBe(newUser.user.id);
   });
 });

@@ -71,6 +71,65 @@
           </div>
         </div>
 
+        <!-- 芝杜 Z9X (WebDAV) 播放器看板 -->
+        <div class="section-group z9x-panel">
+          <div class="flex-between">
+            <div class="z9x-title-wrap">
+              <h3 class="section-title">📺 芝杜 Z9X (WebDAV) 原画直连看板</h3>
+              <span class="z9x-mini-badge">玩法一：免下载秒播</span>
+            </div>
+            <span class="z9x-pill-green">302 官方 CDN 直通</span>
+          </div>
+
+          <p class="z9x-desc">
+            在芝杜 Z9X 海报墙中添加下列 WebDAV 地址，即可免下载直接 4K 原画秒播 AList 聚合的所有网盘（115/夸克/百度）与本地影视，零消耗 NAS 硬盘与性能。
+          </p>
+
+          <div class="z9x-grid">
+            <div class="z9x-item">
+              <div class="z9x-label-row">
+                <span class="z9x-label">🏠 局域网直连 (推荐家里使用·0延迟无限制)</span>
+                <button type="button" class="copy-link-btn" @click="copyText('http://192.168.1.110:45199/dav')">复制</button>
+              </div>
+              <div class="z9x-val font-mono">http://192.168.1.110:45199/dav</div>
+            </div>
+
+            <div class="z9x-item">
+              <div class="z9x-label-row">
+                <span class="z9x-label">🌐 远程/外出地址 (支持公网穿透)</span>
+                <button type="button" class="copy-link-btn" @click="copyText('https://alist.taogehome.cloud/dav')">复制</button>
+              </div>
+              <div class="z9x-val font-mono">https://alist.taogehome.cloud/dav</div>
+            </div>
+
+            <div class="z9x-item-row">
+              <div class="z9x-item half">
+                <div class="z9x-label-row">
+                  <span class="z9x-label">👤 用户名 (与 AList 一致)</span>
+                  <button type="button" class="copy-link-btn" @click="copyText(z9xUser)">复制</button>
+                </div>
+                <input v-model="z9xUser" class="z9x-input font-mono" placeholder="AList 用户名 (如 admin)" />
+              </div>
+              <div class="z9x-item half">
+                <div class="z9x-label-row">
+                  <span class="z9x-label">🔑 密码 (与 AList 一致)</span>
+                  <button type="button" class="copy-link-btn" @click="copyText(z9xPass)">复制</button>
+                </div>
+                <input v-model="z9xPass" type="password" class="z9x-input font-mono" placeholder="输入 AList 密码" />
+              </div>
+            </div>
+          </div>
+
+          <div class="z9x-guide">
+            <div class="guide-title">📖 芝杜海报墙 4.0 添加步骤：</div>
+            <ol class="guide-steps">
+              <li>打开芝杜 Z9X -> 进入<b>「海报墙」</b> -> 导航切到<b>「源设备」</b> -> 点击<b>「+ 添加」</b>；</li>
+              <li>协议类型选择 <b>「WebDAV (HTTP)」</b>，服务器填 <code>192.168.1.110</code>，端口填 <code>45199</code>，路径填 <code>/dav</code>；</li>
+              <li>填入上述账号密码，建议路径分别添加 <code>/dav/115网盘</code> 或 <code>/dav/夸克</code>，保存后即可自动出海报墙！</li>
+            </ol>
+          </div>
+        </div>
+
         <!-- Aria2 / qBittorrent BT 磁力驱动配置 -->
         <div class="section-group">
           <h3 class="section-title">🧲 BT / 磁力下载器驱动 (绿联云影院联动)</h3>
@@ -157,6 +216,18 @@ const saving = ref(false);
 const testingAlist = ref(false);
 const testingTorrent = ref(false);
 const testFeedback = ref<{ success: boolean; message: string } | null>(null);
+
+const z9xUser = ref(typeof localStorage !== "undefined" ? localStorage.getItem("panhub_z9x_user") || "admin" : "admin");
+const z9xPass = ref(typeof localStorage !== "undefined" ? localStorage.getItem("panhub_z9x_pass") || "" : "");
+
+if (typeof window !== "undefined") {
+  watch(z9xUser, (val) => {
+    localStorage.setItem("panhub_z9x_user", val);
+  });
+  watch(z9xPass, (val) => {
+    localStorage.setItem("panhub_z9x_pass", val);
+  });
+}
 
 watch(
   () => props.visible,
@@ -251,6 +322,23 @@ async function saveProfile() {
   } finally {
     saving.value = false;
   }
+}
+
+function copyText(text: string) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text);
+  } else {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+  testFeedback.value = {
+    success: true,
+    message: `已复制到剪贴板: ${text}`,
+  };
 }
 </script>
 
@@ -472,5 +560,150 @@ async function saveProfile() {
 .save-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* 芝杜 Z9X 看板专属样式 */
+.z9x-panel {
+  background: rgba(16, 185, 129, 0.04);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.z9x-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.z9x-mini-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.z9x-pill-green {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.z9x-desc {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 6px 0 12px;
+  line-height: 1.5;
+}
+
+.z9x-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.z9x-item {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.z9x-item-row {
+  display: flex;
+  gap: 10px;
+}
+
+.z9x-item.half {
+  flex: 1;
+}
+
+.z9x-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.z9x-label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.z9x-val {
+  font-size: 12px;
+  color: #6ee7b7;
+  word-break: break-all;
+}
+
+.z9x-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #6ee7b7;
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.z9x-input:focus {
+  border-color: #10b981;
+}
+
+.copy-link-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #d1d5db;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-link-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border-color: #10b981;
+}
+
+.z9x-guide {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.guide-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin-bottom: 6px;
+}
+
+.guide-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.6;
+}
+
+.guide-steps li {
+  margin-bottom: 3px;
+}
+
+.guide-steps code {
+  background: rgba(0, 0, 0, 0.4);
+  color: #34d399;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
 }
 </style>

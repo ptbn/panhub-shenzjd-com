@@ -141,7 +141,7 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .back-to-top-fab {
     right: 18px;
-    bottom: 24px;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     width: 42px;
     height: 42px;
   }

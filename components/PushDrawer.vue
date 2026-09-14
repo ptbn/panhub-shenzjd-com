@@ -5,15 +5,18 @@
       <div class="drawer-header">
         <div class="header-left">
           <div class="nas-icon-badge">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg v-if="isCloud" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+            </svg>
+            <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
           </div>
           <div>
-            <h2 class="drawer-title">推送到 NAS 离线下载</h2>
-            <p class="drawer-subtitle">智能分类 · 目录自动分流 · 联动绿联云影院</p>
+            <h2 class="drawer-title">{{ isCloud ? '转存至网盘 · 芝杜秒播' : '推送到 NAS 离线下载' }}</h2>
+            <p class="drawer-subtitle">{{ isCloud ? '云端免下载 · AList 302 聚合 · 芝杜 Z9X 海报墙直映' : '智能分类 · 目录自动分流 · 联动绿联云影院' }}</p>
           </div>
         </div>
         <button class="close-btn" @click="$emit('close')">✕</button>
@@ -21,7 +24,7 @@
 
       <!-- 反馈消息 -->
       <div v-if="feedback" :class="['feedback-card', feedback.success ? 'feedback-ok' : 'feedback-err']">
-        <div class="feedback-title">{{ feedback.success ? '🎉 推送成功！' : '❌ 推送失败' }}</div>
+        <div class="feedback-title">{{ feedback.success ? '🎉 操作成功！' : '❌ 提示' }}</div>
         <div class="feedback-msg">{{ feedback.message }}</div>
       </div>
 
@@ -31,83 +34,118 @@
         <div class="resource-preview">
           <div class="res-title">{{ item?.note || item?.url }}</div>
           <div class="res-meta">
-            <span class="meta-pill font-mono">{{ isCloud ? '网盘分享链接' : 'BT磁力/种子直链' }}</span>
-            <span v-if="item?.password" class="meta-pill">提取码: {{ item.password }}</span>
-            <span v-if="inferredMediaType" class="meta-pill highlight">{{ inferredMediaType }}</span>
+            <span class="meta-pill font-mono">{{ isCloud ? '网盘分享资源' : 'BT磁力/种子直链' }}</span>
+            <span v-if="item?.password" class="meta-pill highlight">提取码: {{ item.password }}</span>
+            <span v-if="inferredMediaType" class="meta-pill">{{ inferredMediaType }}</span>
           </div>
         </div>
 
-        <!-- 智能分类预设 -->
-        <div class="form-group">
-          <label class="group-label">影视媒体分类 (智能识别)</label>
-          <div class="category-chips">
-            <button
-              type="button"
-              :class="['chip', { active: form.category === 'movie' }]"
-              @click="setCategory('movie')">
-              🎬 电影 (Movies)
-            </button>
-            <button
-              type="button"
-              :class="['chip', { active: form.category === 'tv' }]"
-              @click="setCategory('tv')">
-              📺 电视剧 (TV)
-            </button>
-            <button
-              type="button"
-              :class="['chip', { active: form.category === 'anime' }]"
-              @click="setCategory('anime')">
-              🌸 动漫 (Anime)
-            </button>
-            <button
-              type="button"
-              :class="['chip', { active: form.category === 'other' }]"
-              @click="setCategory('other')">
-              📁 其他文件
-            </button>
+        <!-- 玩法一：网盘类极速转存与芝杜联动面板 -->
+        <div v-if="isCloud" class="z9x-card">
+          <div class="z9x-header">
+            <span class="z9x-badge">📺 芝杜 Z9X 播放流</span>
+            <span class="z9x-tag">4K 原画免下载</span>
+          </div>
+          <div class="z9x-steps">
+            <div class="step-item">
+              <span class="step-num">1</span>
+              <div class="step-text">点击下方<b>「一键转存」</b>，自动复制提取码并直达网盘保存影片；</div>
+            </div>
+            <div class="step-item">
+              <span class="step-num">2</span>
+              <div class="step-text">保存后，片源立即通过 AList 呈现在芝杜 Z9X 海报墙中；</div>
+            </div>
+            <div class="step-item">
+              <span class="step-num">3</span>
+              <div class="step-text">芝杜以 302 原画直链输出杜比视界，<b>零占用 NAS 硬盘与性能</b>。</div>
+            </div>
+          </div>
+
+          <div class="quick-links">
+            <a href="https://alist.taogehome.cloud" target="_blank" class="alist-link">
+              <span>在 AList 媒体库中查看</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </a>
           </div>
         </div>
 
-        <!-- 下载器选择 -->
-        <div class="form-group">
-          <label class="group-label">调度下载器驱动</label>
-          <div class="engine-selector">
-            <label class="engine-option">
-              <input v-model="form.preferredClient" type="radio" value="auto" />
-              <span>自动推荐 (网盘走 AList，磁力走 Aria2)</span>
-            </label>
-            <label class="engine-option">
-              <input v-model="form.preferredClient" type="radio" value="alist" />
-              <span>强制 AList 转存下载</span>
-            </label>
-            <label class="engine-option">
-              <input v-model="form.preferredClient" type="radio" value="aria2" />
-              <span>强制 Aria2 下载</span>
-            </label>
+        <!-- 磁力类资源：下载器调度面板 -->
+        <template v-else>
+          <!-- 智能分类预设 -->
+          <div class="form-group">
+            <label class="group-label">影视媒体分类 (智能识别)</label>
+            <div class="category-chips">
+              <button
+                type="button"
+                :class="['chip', { active: form.category === 'movie' }]"
+                @click="setCategory('movie')">
+                🎬 电影 (Movies)
+              </button>
+              <button
+                type="button"
+                :class="['chip', { active: form.category === 'tv' }]"
+                @click="setCategory('tv')">
+                📺 电视剧 (TV)
+              </button>
+              <button
+                type="button"
+                :class="['chip', { active: form.category === 'anime' }]"
+                @click="setCategory('anime')">
+                🌸 动漫 (Anime)
+              </button>
+              <button
+                type="button"
+                :class="['chip', { active: form.category === 'other' }]"
+                @click="setCategory('other')">
+                📁 其他文件
+              </button>
+            </div>
           </div>
-        </div>
 
-        <!-- 目标落盘目录 -->
-        <div class="form-group">
-          <div class="flex-between">
-            <label class="group-label">目标存储目录 (NAS 影视盘)</label>
-            <button type="button" class="reset-link" @click="resetDefaultPath">恢复默认</button>
+          <!-- 下载器选择 -->
+          <div class="form-group">
+            <label class="group-label">调度下载器驱动</label>
+            <div class="engine-selector">
+              <label class="engine-option">
+                <input v-model="form.preferredClient" type="radio" value="aria2" />
+                <span>Aria2 下载</span>
+              </label>
+              <label class="engine-option">
+                <input v-model="form.preferredClient" type="radio" value="qbittorrent" />
+                <span>qBittorrent (推荐)</span>
+              </label>
+            </div>
           </div>
-          <input
-            v-model="form.targetDir"
-            type="text"
-            class="input-box"
-            placeholder="/Media/Movies" />
-          <p class="hint-text">
-            💡 适配绿联 DX4600：下载至对应目录后，绿联云影院将自动触发文件监控并自动生成海报墙。
-          </p>
-        </div>
+
+          <!-- 目标落盘目录 -->
+          <div class="form-group">
+            <div class="flex-between">
+              <label class="group-label">目标存储目录 (NAS 影视盘)</label>
+              <button type="button" class="reset-link" @click="resetDefaultPath">恢复默认</button>
+            </div>
+            <input
+              v-model="form.targetDir"
+              type="text"
+              class="input-box"
+              placeholder="/Media/Movies" />
+            <p class="hint-text">
+              💡 适配绿联 DX4600：下载至对应目录后，绿联云影院将自动触发文件监控并自动生成海报墙。
+            </p>
+          </div>
+        </template>
       </div>
 
       <!-- 底部操作栏 -->
       <div class="drawer-footer">
-        <button class="cancel-btn" @click="$emit('close')">取消</button>
-        <button class="push-btn" :disabled="pushing" @click="executePush">
+        <button class="cancel-btn" @click="$emit('close')">关闭</button>
+        <button v-if="isCloud" class="push-btn primary-glow" @click="executeCloudTransfer">
+          <span>🚀 复制提取码并前往网盘转存</span>
+        </button>
+        <button v-else class="push-btn" :disabled="pushing" @click="executePush">
           <span v-if="pushing" class="spinner"></span>
           <span>{{ pushing ? '正在向 NAS 下发指令...' : '📥 立即推送到 NAS' }}</span>
         </button>
@@ -187,6 +225,40 @@ function setCategory(cat: "movie" | "tv" | "anime" | "other") {
 
 function resetDefaultPath() {
   setCategory(form.category);
+}
+
+async function executeCloudTransfer() {
+  if (!props.item?.url) return;
+  feedback.value = null;
+
+  // 1. 复制提取码到剪贴板
+  if (props.item.password) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(props.item.password);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = props.item.password;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+    } catch (e) {
+      console.warn("Clipboard copy failed", e);
+    }
+  }
+
+  // 2. 在新标签页唤起网盘分享页
+  window.open(props.item.url, "_blank", "noopener,noreferrer");
+
+  // 3. 给出清晰的芝杜联动反馈
+  feedback.value = {
+    success: true,
+    message: props.item.password
+      ? `提取码 [${props.item.password}] 已自动复制！网盘页面已打开。存入网盘后，芝杜 Z9X 海报墙即可免下载 4K 秒播！`
+      : "网盘分享页面已打开。存入网盘后，芝杜 Z9X 播放器即可免下载 4K 秒播！",
+  };
 }
 
 async function executePush() {
@@ -521,5 +593,97 @@ async function executePush() {
   to {
     transform: rotate(360deg);
   }
+}
+
+.primary-glow {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+.z9x-card {
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.z9x-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.z9x-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: #34d399;
+}
+
+.z9x-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  font-weight: 500;
+}
+
+.z9x-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.step-text {
+  font-size: 12px;
+  color: #d1d5db;
+  line-height: 1.5;
+}
+
+.step-text b {
+  color: #34d399;
+}
+
+.quick-links {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.alist-link {
+  font-size: 12px;
+  color: #9ca3af;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s;
+}
+
+.alist-link:hover {
+  color: #34d399;
 }
 </style>
