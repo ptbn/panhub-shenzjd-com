@@ -54,6 +54,22 @@ export default defineNuxtConfig({
     },
   },
   routeRules: {
+    // 认证、管理、NAS 接口涉及用户私有 Session，严格禁止任何 CDN 与 SWR 缓存
+    "/api/auth/**": {
+      swr: false,
+      cache: false,
+      headers: { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" },
+    },
+    "/api/admin/**": {
+      swr: false,
+      cache: false,
+      headers: { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" },
+    },
+    "/api/nas/**": {
+      swr: false,
+      cache: false,
+      headers: { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" },
+    },
     // 豆瓣热搜允许短时缓存（服务端已有 24 小时内存缓存）
     "/api/douban-hot": { swr: false, cache: false },
     // 搜索接口依赖 Cookie 鉴权，禁止缓存避免 401 被缓存
