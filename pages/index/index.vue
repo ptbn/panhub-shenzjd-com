@@ -245,7 +245,11 @@ const isStickyActive = ref(false);
 function onLayoutScroll() {
   if (typeof window === "undefined") return;
   const layout = document.querySelector(".layout");
-  const scrollTop = layout ? layout.scrollTop : window.scrollY;
+  const scrollTop =
+    (layout && layout.scrollTop > 0 ? layout.scrollTop : 0) ||
+    window.scrollY ||
+    document.documentElement?.scrollTop ||
+    0;
   // 当视口滚动超过 240px 时平滑滑入紧凑吸顶栏
   isStickyActive.value = scrollTop > 240;
 }
@@ -255,13 +259,13 @@ function scrollToAnchor() {
   nextTick(() => {
     const anchor = document.getElementById("results-anchor");
     const layout = document.querySelector(".layout");
-    if (anchor && layout) {
-      const top = anchor.offsetTop - 120; // 预留 TopAppBar (60px) + CompactStickyBar (50px) 空间
-      layout.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    } else if (layout) {
-      layout.scrollTo({ top: 0, behavior: "smooth" });
-    } else if (anchor) {
-      anchor.scrollIntoView({ behavior: "smooth" });
+    if (anchor) {
+      const top = Math.max(0, anchor.offsetTop - 120); // 预留 TopAppBar (60px) + CompactStickyBar (50px) 空间
+      if (layout && layout.scrollTop > 0) {
+        layout.scrollTo({ top, behavior: "smooth" });
+      }
+      window.scrollTo({ top, behavior: "smooth" });
+      document.documentElement?.scrollTo({ top, behavior: "smooth" });
     }
   });
 }

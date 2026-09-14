@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install Dependencies
@@ -29,4 +29,8 @@ jobs:
         run: npx vitest run --exclude "**/tg-fetch.test.ts" --exclude "**/tg-multipage.test.ts"
 
       - name: Verify Cloudflare Workers Module Build
-        run: NITRO_PRESET=cloudflare_module npx nuxt build
+        env:
+          NITRO_PRESET: cloudflare_module
+          NUXT_TELEMETRY_DISABLED: "1"
+          CI: "true"
+        run: npx nuxt build

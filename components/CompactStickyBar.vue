@@ -3,14 +3,14 @@
     <aside
       v-show="active"
       class="compact-floating-island"
-      :class="{ 'is-expanded': isSearchExpanded }"
+      :class="{ 'is-expanded': isSearchExpanded || !platformList || platformList.length === 0 }"
       role="toolbar"
       aria-label="快捷筛选与检索灵动胶囊"
       data-theme-part="compact-island">
       <div class="island-body">
-        <!-- 默认模式：平台横向筛选胶囊组 -->
+        <!-- 平台横向筛选胶囊组（仅在已获搜索结果且未主动展开搜索时展示） -->
         <Transition name="fade-morph" mode="out-in">
-          <div v-if="!isSearchExpanded" key="pills-mode" class="island-pills-bar">
+          <div v-if="!isSearchExpanded && platformList && platformList.length > 0" key="pills-mode" class="island-pills-bar">
             <!-- 平台胶囊容器 -->
             <div class="pills-scroller" ref="scrollerRef">
               <button
@@ -54,7 +54,7 @@
             </button>
           </div>
 
-          <!-- 搜索展开模式：平滑形变出的输入舱 -->
+          <!-- 搜索输入模式：平滑形变出的输入舱（主动展开或初始未搜索状态） -->
           <div v-else key="search-mode" class="island-search-bar">
             <div class="search-input-wrap">
               <div class="input-icon" aria-hidden="true">
@@ -93,8 +93,9 @@
               搜索
             </button>
 
-            <!-- 收起折叠按钮 -->
+            <!-- 收起折叠按钮 (仅在有平台胶囊时才提供折叠收起) -->
             <button
+              v-if="platformList && platformList.length > 0"
               type="button"
               class="island-collapse-btn"
               title="收起搜索框"
