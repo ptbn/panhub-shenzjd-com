@@ -168,35 +168,24 @@ export async function validateSession(
 ): Promise<UserPublic | null> {
   if (!token) return null;
 
-  // 1. 优先检查数据库中的会话
-  const session = await db.getSession(token);
-  if (session) {
-    if (session.expiresAt < Date.now()) {
-      await db.deleteSession(token);
-      return null;
-    }
-    const user = await db.getUserById(session.userId);
-    if (!user || user.status === "frozen") {
-      if (user?.status === "frozen") {
-        await db.deleteSession(token);
-      }
-      return null;
-    }
-    db.updateUserLastActive(user.id, Date.now()).catch(() => {});
-    return toPublicUser(user);
+  // 0. 检查是否已被当前节点显式注销 (Revoked)
+  if (typeof (db as any).isSessionRevoked === "function" && (db as any).isSessionRevoked(token)) {
+    return null;
   }
 
-  // 2. 若数据库中未找到该 session：
-  // 检查是否为分布式无状态隔离（例如冷启动或未挂载持久层的新 Isolate）
+  // 1. 优先尝试自包含签名 Session 校验 (支持 Cloudflare 全球集群跨 Isolate 零丢失)
   const signed = await verifySessionToken(token);
   if (signed) {
     const userInDb = await db.getUserById(signed.id).catch(() => null);
-    // 如果数据库存在该用户但无 session，说明该用户已被注销或 session 被显式删除
     if (userInDb) {
-      return null;
+      if (userInDb.status === "frozen") {
+        return null;
+      }
+      db.updateUserLastActive(userInDb.id, Date.now()).catch(() => {});
+      return toPublicUser(userInDb);
     }
 
-    // 若数据库完全不存在该用户（纯无状态全新节点），自动同步并创建 session
+    // 若当前无状态全新节点内存中尚未缓存该用户，自动补入内存
     if (typeof (db as any).createUser === "function") {
       await (db as any).createUser({
         id: signed.id,
@@ -212,7 +201,25 @@ export async function validateSession(
     return signed;
   }
 
-  return null;
+  // 2. 回退到普通数据库 Session 记录
+  const session = await db.getSession(token);
+  if (!session) return null;
+
+  if (session.expiresAt < Date.now()) {
+    await db.deleteSession(token);
+    return null;
+  }
+
+  const user = await db.getUserById(session.userId);
+  if (!user || user.status === "frozen") {
+    if (user?.status === "frozen") {
+      await db.deleteSession(token);
+    }
+    return null;
+  }
+
+  db.updateUserLastActive(user.id, Date.now()).catch(() => {});
+  return toPublicUser(user);
 }
 
 export async function logoutUser(token: string, db: DatabaseAdapter): Promise<void> {

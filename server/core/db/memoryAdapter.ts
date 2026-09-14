@@ -28,6 +28,7 @@ export const DEFAULT_ADMIN_USER: UserRecord = {
 export class MemoryDatabaseAdapter implements DatabaseAdapter {
   private users = new Map<string, UserRecord>();
   private sessions = new Map<string, SessionRecord>();
+  private revokedSessions = new Set<string>();
   private invites = new Map<string, InviteRecord>();
   private nasProfiles = new Map<string, NasProfileRecord>();
   private pushLogs: PushLogRecord[] = [];
@@ -136,6 +137,11 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
 
   async deleteSession(token: string): Promise<void> {
     this.sessions.delete(token);
+    this.revokedSessions.add(token);
+  }
+
+  isSessionRevoked(token: string): boolean {
+    return this.revokedSessions.has(token);
   }
 
   async deleteSessionsByUser(userId: string): Promise<void> {
@@ -248,6 +254,7 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
   reset(): void {
     this.users.clear();
     this.sessions.clear();
+    this.revokedSessions.clear();
     this.invites.clear();
     this.nasProfiles.clear();
     this.pushLogs = [];
