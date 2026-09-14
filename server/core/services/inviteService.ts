@@ -11,7 +11,8 @@ export async function createInviteCode(
   db: DatabaseAdapter,
   ttlMs: number = DEFAULT_INVITE_TTL_MS
 ): Promise<InviteRecord> {
-  const expiresAt = Date.now() + ttlMs;
+  const now = Date.now();
+  const expiresAt = now + ttlMs;
   // 生成 8 位自包含防篡改加密签名邀请码 (全球跨节点无状态零丢失)
   let code = await generateSignedInviteCode(expiresAt);
   // 碰撞预防
@@ -23,7 +24,7 @@ export async function createInviteCode(
     attempts++;
   }
 
-  return await db.createInvite(code, createdByUserId, expiresAt);
+  return await db.createInvite(code, createdByUserId, expiresAt, now);
 }
 
 export async function listAllInvites(db: DatabaseAdapter): Promise<InviteRecord[]> {

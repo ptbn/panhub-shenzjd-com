@@ -194,8 +194,8 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
   }
 
   // Invites
-  async createInvite(code: string, createdBy: string, expiresAt?: number | null): Promise<InviteRecord> {
-    const now = Date.now();
+  async createInvite(code: string, createdBy: string, expiresAt?: number | null, createdAt?: number): Promise<InviteRecord> {
+    const now = createdAt !== undefined ? createdAt : Date.now();
     const upperCode = code.toUpperCase().trim();
     const finalExpiresAt = expiresAt !== undefined ? expiresAt : (now + 60 * 60 * 1000);
     await this.db

@@ -103,7 +103,7 @@ export interface DatabaseAdapter {
   deleteSessionsByUser(userId: string): Promise<void>;
 
   // Invites
-  createInvite(code: string, createdBy: string, expiresAt?: number | null): Promise<InviteRecord>;
+  createInvite(code: string, createdBy: string, expiresAt?: number | null, createdAt?: number): Promise<InviteRecord>;
   getInvite(code: string): Promise<InviteRecord | null>;
   useInvite(code: string, userId: string): Promise<boolean>;
   revokeInvite(code: string): Promise<boolean>;

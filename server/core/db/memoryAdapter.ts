@@ -153,8 +153,8 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
   }
 
   // Invites
-  async createInvite(code: string, createdBy: string, expiresAt?: number | null): Promise<InviteRecord> {
-    const now = Date.now();
+  async createInvite(code: string, createdBy: string, expiresAt?: number | null, createdAt?: number): Promise<InviteRecord> {
+    const now = createdAt !== undefined ? createdAt : Date.now();
     const finalExpiresAt = expiresAt !== undefined ? expiresAt : (now + 60 * 60 * 1000);
     const invite: InviteRecord = {
       code: code.toUpperCase().trim(),
