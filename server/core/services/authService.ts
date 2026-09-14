@@ -9,6 +9,7 @@ import {
   verifyPassword,
   signSessionToken,
   verifySessionToken,
+  verifySignedInviteCode,
 } from "../db/crypto";
 
 export interface RegisterDto {
@@ -40,6 +41,34 @@ export function toPublicUser(u: UserRecord): UserPublic {
     createdAt: u.createdAt,
     lastActiveAt: u.lastActiveAt,
   };
+}
+
+async function syncEdgeUser(user: UserRecord): Promise<void> {
+  const cache = (globalThis as any).caches?.default;
+  if (!cache) return;
+  try {
+    const url = `https://panhub-internal.local/users/${encodeURIComponent(user.email.toLowerCase().trim())}`;
+    const res = new Response(JSON.stringify(user), {
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "public, max-age=2592000, s-maxage=2592000",
+      },
+    });
+    await cache.put(new Request(url), res);
+  } catch {}
+}
+
+async function findEdgeUser(email: string): Promise<UserRecord | null> {
+  const cache = (globalThis as any).caches?.default;
+  if (!cache) return null;
+  try {
+    const url = `https://panhub-internal.local/users/${encodeURIComponent(email.toLowerCase().trim())}`;
+    const res = await cache.match(new Request(url));
+    if (!res) return null;
+    return (await res.json()) as UserRecord;
+  } catch {
+    return null;
+  }
 }
 
 export async function isBootstrapMode(db: DatabaseAdapter): Promise<boolean> {
@@ -80,7 +109,17 @@ export async function registerUser(
       if (!code) {
         throw new Error("本站处于私有化封闭运行模式，注册必须填写邀请码");
       }
-      const invite = await db.getInvite(code);
+      let invite = await db.getInvite(code);
+      if (!invite) {
+        // 跨节点无状态 Isolate 校验：尝试加密签名还原
+        const signed = await verifySignedInviteCode(code);
+        if (signed && signed.valid) {
+          if (Date.now() > signed.expiresAt) {
+            throw new Error("邀请码已过期（默认有效期为 1 小时），请向管理员索取新邀请码");
+          }
+          invite = await db.createInvite(code, "u_admin_twisper", signed.expiresAt);
+        }
+      }
       if (!invite || invite.isRevoked || invite.usedBy) {
         throw new Error("邀请码无效、已过期或已被使用");
       }
@@ -113,6 +152,9 @@ export async function registerUser(
     status: "active",
   });
 
+  // 同步到 Edge 缓存 (多 Isolate 数据共享)
+  syncEdgeUser(newUser).catch(() => {});
+
   const publicUser = toPublicUser(newUser);
   const sessionToken = await signSessionToken(publicUser);
   const session = await db.createSession(sessionToken, newUser.id, SESSION_TTL_MS);
@@ -133,7 +175,13 @@ export async function loginUser(
     throw new Error("邮箱和密码不能为空");
   }
 
-  const user = await db.getUserByEmail(cleanEmail);
+  let user = await db.getUserByEmail(cleanEmail);
+  if (!user) {
+    user = await findEdgeUser(cleanEmail);
+    if (user && typeof (db as any).createUser === "function") {
+      await (db as any).createUser(user).catch(() => {});
+    }
+  }
   if (!user) {
     throw new Error("邮箱或密码错误");
   }

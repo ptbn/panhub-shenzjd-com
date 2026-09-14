@@ -19,6 +19,12 @@
         <span>系统初始启动：首位注册用户将自动晋升为<strong>系统超级管理员</strong>（免邀请码）</span>
       </div>
 
+      <!-- 专属邀请码横幅 -->
+      <div v-if="mode === 'register' && regForm.inviteCode" class="invite-banner">
+        <span class="sparkle">🎟️</span>
+        <span>已自动应用准入邀请码：<strong class="font-mono tracking-wider">{{ regForm.inviteCode }}</strong>（1 小时内有效）</span>
+      </div>
+
       <!-- 切换标签 -->
       <div class="tab-group">
         <button
@@ -61,7 +67,7 @@
             v-model="loginForm.email"
             type="email"
             required
-            placeholder="383004858@qq.com"
+            placeholder="例如: user@example.com"
             autocomplete="username" />
         </div>
         <div class="form-item">
@@ -96,7 +102,7 @@
             v-model="regForm.email"
             type="email"
             required
-            placeholder="383004858@qq.com"
+            placeholder="例如: user@example.com"
             autocomplete="email" />
         </div>
         <div class="form-item">
@@ -117,8 +123,9 @@
             required
             maxlength="8"
             placeholder="例如: A7K9X2P4"
+            @input="regForm.inviteCode = regForm.inviteCode.toUpperCase().replace(/[^2-9A-HJ-NP-Z]/g, '')"
             style="text-transform: uppercase; font-family: monospace; letter-spacing: 2px;" />
-          <p class="field-hint">请向超级管理员索取 8 位专属一次性邀请码</p>
+          <p class="field-hint">请向超级管理员索取 8 位专属一次性邀请码（1 小时内有效）</p>
         </div>
         <button type="submit" class="submit-btn" :disabled="submitting">
           <span v-if="submitting" class="spinner"></span>
@@ -141,24 +148,31 @@ const errorMessage = ref("");
 const successMessage = ref("");
 
 const loginForm = reactive({
-  email: "383004858@qq.com",
+  email: "",
   password: "",
 });
 
 const regForm = reactive({
-  username: "twisper",
-  email: "383004858@qq.com",
+  username: "",
+  email: "",
   password: "",
   inviteCode: "",
 });
 
 onMounted(async () => {
+  // 1. 优先读取并应用 URL 中的邀请码（例如 ?invite=XXXXXXXX）
+  const queryInvite = (route.query.invite as string)?.trim();
+  if (queryInvite) {
+    regForm.inviteCode = queryInvite.toUpperCase();
+    mode.value = "register";
+  }
+
   try {
     const res = await $fetch<{ isBootstrap: boolean }>(`/api/auth/bootstrap-status?_t=${Date.now()}`);
     isBootstrap.value = res.isBootstrap;
     if (isBootstrap.value) {
       mode.value = "register";
-    } else {
+    } else if (!queryInvite) {
       mode.value = "login";
     }
   } catch (e) {
@@ -198,7 +212,12 @@ async function handleRegister() {
   try {
     const res = await $fetch<{ success: boolean; user: any; token?: string }>("/api/auth/register", {
       method: "POST",
-      body: regForm,
+      body: {
+        username: regForm.username.trim(),
+        email: regForm.email.trim().toLowerCase(),
+        password: regForm.password,
+        inviteCode: regForm.inviteCode.trim().toUpperCase(),
+      },
     });
     if (res?.token) {
       setStoredToken(res.token);
@@ -211,12 +230,9 @@ async function handleRegister() {
     }, 300);
   } catch (err: any) {
     const msg = err.data?.message || err.message || "注册失败，请检查邀请码与输入";
+    errorMessage.value = msg;
     if (msg.includes("已存在") || msg.includes("已被注册")) {
       loginForm.email = regForm.email;
-      mode.value = "login";
-      errorMessage.value = "该账号已注册为超级管理员，请直接输入密码登录";
-    } else {
-      errorMessage.value = msg;
     }
   } finally {
     submitting.value = false;
@@ -285,6 +301,20 @@ async function handleRegister() {
   line-height: 1.5;
   display: flex;
   align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.invite-banner {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
   gap: 8px;
   margin-bottom: 20px;
 }

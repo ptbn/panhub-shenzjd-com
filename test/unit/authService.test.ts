@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getMemoryDatabase } from "../../server/core/db/index";
+import { MemoryDatabaseAdapter } from "../../server/core/db/memoryAdapter";
 import {
   registerUser,
   loginUser,
@@ -135,6 +136,55 @@ describe("Auth & Invite Service 测试 (封闭准入、自举Admin与一次性�
         db
       )
     ).rejects.toThrow("邀请码已过期");
+  });
+
+  it("跨节点无状态 Isolate 模拟：在无共享内存的全新节点凭签名邀请码成功注册", async () => {
+    // 节点 1 (Isolate A): 管理员生成签名邀请码
+    const isolateA = new MemoryDatabaseAdapter();
+    await isolateA.init();
+    const admin = await isolateA.getUserByEmail("383004858@qq.com");
+    expect(admin).not.toBeNull();
+
+    const invite = await createInviteCode(admin!.id, isolateA);
+    expect(invite.code).toHaveLength(8);
+
+    // 节点 2 (Isolate B): 模拟全新的独立边缘 Isolate，内存中完全没有该邀请码
+    const isolateB = new MemoryDatabaseAdapter();
+    await isolateB.init();
+    expect(await isolateB.getInvite(invite.code)).toBeNull(); // 验证 Isolate B 确实没有该码
+
+    // 用户在 Isolate B 使用该邀请码注册，通过 HMAC-SHA256 签名自校验成功核销
+    const regRes = await registerUser(
+      {
+        email: "cross_isolate_user@test.com",
+        username: "跨节点用户",
+        password: "UserPassword123",
+        inviteCode: invite.code,
+      },
+      isolateB
+    );
+
+    expect(regRes.user.email).toBe("cross_isolate_user@test.com");
+    expect(regRes.user.role).toBe("user");
+    expect(regRes.session.token).toBeDefined();
+
+    // 注册后在 Isolate B 该邀请码已被核销
+    const consumed = await isolateB.getInvite(invite.code);
+    expect(consumed).not.toBeNull();
+    expect(consumed?.usedBy).toBe(regRes.user.id);
+
+    // 再次在 Isolate B 使用该邀请码注册必定失败
+    await expect(
+      registerUser(
+        {
+          email: "another_user@test.com",
+          username: "重试用户",
+          password: "UserPassword123",
+          inviteCode: invite.code,
+        },
+        isolateB
+      )
+    ).rejects.toThrow("邀请码无效、已过期或已被使用");
   });
 
   it("登录验证：正确密码成功，错误密码失败，冻结账号拦截", async () => {

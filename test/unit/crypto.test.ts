@@ -82,4 +82,30 @@ describe("Web Crypto 安全模块测试 (纯 JS/TS 零 C++ 依赖)", () => {
     const tampered = token.slice(0, -4) + "abcd";
     expect(await verifySessionToken(tampered)).toBeNull();
   });
+
+  it("自包含 HMAC-SHA256 8 位邀请码签名与验签闭环", async () => {
+    const { generateSignedInviteCode, verifySignedInviteCode } = await import(
+      "../../server/core/db/crypto"
+    );
+
+    const expiresAt = Date.now() + 60 * 60 * 1000; // 1小时后
+    const code = await generateSignedInviteCode(expiresAt);
+
+    expect(code).toHaveLength(8);
+    expect(code).not.toMatch(/[01OI]/); // 保持 Base32 无歧义字符集
+
+    // 验签并还原时间戳
+    const verified = await verifySignedInviteCode(code);
+    expect(verified).not.toBeNull();
+    expect(verified?.valid).toBe(true);
+    // 时间精度在 1 分钟（60000ms）之内
+    expect(Math.abs(verified!.expiresAt - expiresAt)).toBeLessThan(60000);
+
+    // 篡改邀请码末尾字符应当验签失败
+    const badCode = code.slice(0, 7) + (code[7] === "X" ? "Y" : "X");
+    expect(await verifySignedInviteCode(badCode)).toBeNull();
+
+    // 伪造随机字符应当验签失败
+    expect(await verifySignedInviteCode("ABCDEFGH")).toBeNull();
+  });
 });

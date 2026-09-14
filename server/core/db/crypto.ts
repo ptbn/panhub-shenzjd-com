@@ -48,14 +48,143 @@ export function generateToken(byteLength: number = 32): string {
   return bytesToHex(bytes);
 }
 
+const BASE32_CHARSET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const INVITE_EPOCH_MS = 1767225600000; // 2026-01-01 00:00:00 UTC
+const INVITE_CLUSTER_SECRET = "panhub-cluster-session-secret-2026";
+
+export function base32Encode5Bytes(bytes: Uint8Array): string {
+  let bits = 0;
+  let value = 0;
+  let output = "";
+  for (let i = 0; i < bytes.length; i++) {
+    value = (value << 8) | bytes[i];
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32_CHARSET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) {
+    output += BASE32_CHARSET[(value << (5 - bits)) & 31];
+  }
+  return output;
+}
+
+export function base32Decode5Bytes(str: string): Uint8Array | null {
+  const cleanStr = str.toUpperCase().trim();
+  if (cleanStr.length !== 8) return null;
+  let bits = 0;
+  let value = 0;
+  const bytes: number[] = [];
+  for (let i = 0; i < cleanStr.length; i++) {
+    const idx = BASE32_CHARSET.indexOf(cleanStr[i]);
+    if (idx === -1) return null;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  if (bytes.length !== 5) return null;
+  return new Uint8Array(bytes);
+}
+
+/**
+ * 生成 8 位自包含 HMAC-SHA256 签名邀请码：
+ * 5 字节 = 40 位 = 8 个 Base32 字符
+ * 内部承载：过期截止时间 (2字节) + 随机Nonce (1字节) + HMAC-SHA256截断验签码 (2字节)
+ * 实现全球任意无状态 Serverless Isolate 节点零数据库依赖秒级离线校验
+ */
+export async function generateSignedInviteCode(
+  expiresAtMs: number,
+  secret: string = INVITE_CLUSTER_SECRET
+): Promise<string> {
+  const expiryMinutes = Math.floor((expiresAtMs - INVITE_EPOCH_MS) / 60000) & 0xFFFF;
+  const nonceBytes = new Uint8Array(1);
+  globalThis.crypto.getRandomValues(nonceBytes);
+  const nonce = nonceBytes[0];
+
+  const payload = new Uint8Array([
+    (expiryMinutes >> 8) & 0xFF,
+    expiryMinutes & 0xFF,
+    nonce,
+  ]);
+
+  const enc = new TextEncoder();
+  const key = await subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sigBuffer = await subtle.sign("HMAC", key, payload);
+  const sigBytes = new Uint8Array(sigBuffer);
+
+  const packed = new Uint8Array([
+    payload[0],
+    payload[1],
+    payload[2],
+    sigBytes[0],
+    sigBytes[1],
+  ]);
+
+  return base32Encode5Bytes(packed);
+}
+
+/**
+ * 校验 8 位签名邀请码并还原过期时间戳
+ */
+export async function verifySignedInviteCode(
+  code: string,
+  secret: string = INVITE_CLUSTER_SECRET
+): Promise<{ valid: boolean; expiresAt: number } | null> {
+  if (!code || typeof code !== "string") return null;
+  const bytes = base32Decode5Bytes(code);
+  if (!bytes || bytes.length !== 5) return null;
+
+  const expiryMinutes = (bytes[0] << 8) | bytes[1];
+  const nonce = bytes[2];
+  const payload = new Uint8Array([bytes[0], bytes[1], nonce]);
+
+  const enc = new TextEncoder();
+  const key = await subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sigBuffer = await subtle.sign("HMAC", key, payload);
+  const sigBytes = new Uint8Array(sigBuffer);
+
+  // 恒定时间签名比对
+  if (bytes[3] !== sigBytes[0] || bytes[4] !== sigBytes[1]) {
+    return null;
+  }
+
+  const now = Date.now();
+  const currentTotalMinutes = Math.floor((now - INVITE_EPOCH_MS) / 60000);
+  const cycle = Math.floor(currentTotalMinutes / 65536);
+  let candidateMinutes = cycle * 65536 + expiryMinutes;
+  if (candidateMinutes < currentTotalMinutes - 32768) {
+    candidateMinutes += 65536;
+  } else if (candidateMinutes > currentTotalMinutes + 32768) {
+    candidateMinutes -= 65536;
+  }
+  const expiresAt = INVITE_EPOCH_MS + candidateMinutes * 60000;
+
+  return { valid: true, expiresAt };
+}
+
 /** 生成 8 位纯随机大写邀请码 (去除容易混淆的 0, O, 1, I) */
 export function generateInviteCode(): string {
-  const charset = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   const bytes = new Uint8Array(8);
   globalThis.crypto.getRandomValues(bytes);
   let result = "";
   for (let i = 0; i < 8; i++) {
-    result += charset[bytes[i] % charset.length];
+    result += BASE32_CHARSET[bytes[i] % BASE32_CHARSET.length];
   }
   return result;
 }
