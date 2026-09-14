@@ -132,7 +132,7 @@
 <script setup lang="ts">
 const route = useRoute();
 const router = useRouter();
-const { fetchUser } = useAuth();
+const { fetchUser, setStoredToken } = useAuth();
 
 const mode = ref<"login" | "register">("login");
 const isBootstrap = ref(false);
@@ -154,10 +154,12 @@ const regForm = reactive({
 
 onMounted(async () => {
   try {
-    const res = await $fetch<{ isBootstrap: boolean }>("/api/auth/bootstrap-status");
+    const res = await $fetch<{ isBootstrap: boolean }>(`/api/auth/bootstrap-status?_t=${Date.now()}`);
     isBootstrap.value = res.isBootstrap;
     if (isBootstrap.value) {
       mode.value = "register";
+    } else {
+      mode.value = "login";
     }
   } catch (e) {
     console.warn("获取自举状态失败:", e);
@@ -169,10 +171,13 @@ async function handleLogin() {
   errorMessage.value = "";
   successMessage.value = "";
   try {
-    await $fetch("/api/auth/login", {
+    const res = await $fetch<{ success: boolean; user: any; token?: string }>("/api/auth/login", {
       method: "POST",
       body: loginForm,
     });
+    if (res?.token) {
+      setStoredToken(res.token);
+    }
     successMessage.value = "登录成功，正在前往主页...";
     await fetchUser();
     const redirect = (route.query.redirect as string) || "/";
@@ -191,10 +196,13 @@ async function handleRegister() {
   errorMessage.value = "";
   successMessage.value = "";
   try {
-    await $fetch("/api/auth/register", {
+    const res = await $fetch<{ success: boolean; user: any; token?: string }>("/api/auth/register", {
       method: "POST",
       body: regForm,
     });
+    if (res?.token) {
+      setStoredToken(res.token);
+    }
     successMessage.value = "账号创建成功，正在前往主页...";
     await fetchUser();
     const redirect = (route.query.redirect as string) || "/";
@@ -202,7 +210,14 @@ async function handleRegister() {
       window.location.href = redirect;
     }, 300);
   } catch (err: any) {
-    errorMessage.value = err.data?.message || err.message || "注册失败，请检查邀请码与输入";
+    const msg = err.data?.message || err.message || "注册失败，请检查邀请码与输入";
+    if (msg.includes("已存在") || msg.includes("已被注册")) {
+      loginForm.email = regForm.email;
+      mode.value = "login";
+      errorMessage.value = "该账号已注册为超级管理员，请直接输入密码登录";
+    } else {
+      errorMessage.value = msg;
+    }
   } finally {
     submitting.value = false;
   }

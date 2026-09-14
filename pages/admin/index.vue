@@ -261,10 +261,11 @@ function formatDate(ts: number | null | undefined): string {
 
 async function loadData() {
   try {
+    const t = Date.now();
     const [uRes, iRes, lRes] = await Promise.all([
-      $fetch<{ users: any[] }>("/api/admin/users"),
-      $fetch<{ invites: any[] }>("/api/admin/invites"),
-      $fetch<{ logs: any[] }>("/api/admin/history"),
+      $fetch<{ users: any[] }>(`/api/admin/users?_t=${t}`),
+      $fetch<{ invites: any[] }>(`/api/admin/invites?_t=${t}`),
+      $fetch<{ logs: any[] }>(`/api/admin/history?_t=${t}`),
     ]);
     users.value = uRes.users;
     invites.value = iRes.invites;

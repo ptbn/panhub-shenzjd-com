@@ -80,8 +80,12 @@ export default defineNuxtConfig({
     // 链接检测接口需要读 POST body，禁止缓存避免 body 被中间件消费
     "/api/check": { swr: false, cache: false },
     // 图片代理依赖豆瓣，禁止 SWR 缓存避免错误响应被缓存
-    "/api/img": { swr: false, cache: false },
-    "/**": { swr: 3600 },
+    // 页面路由与未显式匹配的接口：禁止 SWR 缓存，防止鉴权 302 重定向与用户私有状态被边缘 CDN 串联缓存
+    "/**": {
+      swr: false,
+      cache: false,
+      headers: { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" },
+    },
   },
   runtimeConfig: {
     // 搜索源（频道/插件）知识只存在于后端，不注入 runtimeConfig。

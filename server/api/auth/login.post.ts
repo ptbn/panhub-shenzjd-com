@@ -18,6 +18,7 @@ export default defineEventHandler(async (event) => {
     return {
       success: true,
       user,
+      token: session.token,
     };
   } catch (err: any) {
     throw createError({
