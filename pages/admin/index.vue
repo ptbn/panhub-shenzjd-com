@@ -59,9 +59,15 @@
 
     <!-- TAB 1: 用户管理 -->
     <div v-if="activeTab === 'users'" class="tab-content">
-      <div class="toolbar">
-        <button class="primary-btn" @click="showAddUserModal = true">
-          + 录入 / 直接添加新用户
+      <div class="toolbar user-toolbar">
+        <button class="primary-btn add-user-btn" @click="openAddUserModal">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="19" y1="8" x2="19" y2="14" />
+            <line x1="22" y1="11" x2="16" y2="11" />
+          </svg>
+          <span>快速录入新用户</span>
         </button>
       </div>
 
@@ -259,62 +265,235 @@
       </div>
     </div>
 
-    <!-- 直接创建/录入用户弹窗 -->
-    <div v-if="showAddUserModal" class="modal-overlay" @click.self="showAddUserModal = false">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="modal-title">快速录入 / 添加新用户</h3>
-          <button class="modal-close" @click="showAddUserModal = false">×</button>
-        </div>
-        <div class="modal-body">
-          <p class="modal-desc">
-            管理员可直接录入或创建用户账号，无需填写邀请码。录入后用户可立即使用账号密码登录，数据将在本地与服务端双向固化。
-          </p>
-          <div class="mb-4">
-            <label class="block text-xs font-medium text-gray-300 mb-1">登录邮箱 *</label>
-            <input
-              v-model="newUserForm.email"
-              type="email"
-              class="w-full p-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm outline-none focus:border-emerald-500"
-              placeholder="例如: friend@example.com" />
+    <!-- 直接创建/录入用户弹窗 (全要素 Apple/Linear 现代化美学重塑) -->
+    <Transition name="modal-spring">
+      <div v-if="showAddUserModal" class="modal-overlay" @click.self="closeAddUserModal">
+        <div class="modal-card user-modal-card">
+          <!-- 弹窗顶栏 -->
+          <div class="modal-header">
+            <div class="header-left-group">
+              <div class="modal-badge-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <line x1="19" y1="8" x2="19" y2="14" />
+                  <line x1="22" y1="11" x2="16" y2="11" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="modal-title">快速录入 / 签发新用户</h3>
+                <p class="modal-subtitle">直接创建专属账户，免邀请码即刻生效并固化至边缘节点</p>
+              </div>
+            </div>
+            <button class="modal-close" title="关闭" @click="closeAddUserModal">✕</button>
           </div>
-          <div class="mb-4">
-            <label class="block text-xs font-medium text-gray-300 mb-1">用户名 *</label>
-            <input
-              v-model="newUserForm.username"
-              type="text"
-              class="w-full p-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm outline-none focus:border-emerald-500"
-              placeholder="例如: 家庭成员" />
+
+          <!-- 模式 1：用户信息录入表单 -->
+          <div v-if="!createdCredential" class="modal-body user-modal-body">
+            <!-- 登录邮箱 -->
+            <div class="form-group">
+              <label class="form-label">
+                <span>登录邮箱</span>
+                <span class="required-star">*</span>
+              </label>
+              <div class="input-icon-wrap">
+                <span class="input-addon-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+                  </svg>
+                </span>
+                <input
+                  v-model="newUserForm.email"
+                  type="email"
+                  class="modal-input"
+                  placeholder="例如: friend@taogehome.cloud"
+                  autocomplete="off" />
+              </div>
+            </div>
+
+            <!-- 用户名 -->
+            <div class="form-group">
+              <label class="form-label">
+                <span>用户名称 / 昵称</span>
+                <span class="required-star">*</span>
+              </label>
+              <div class="input-icon-wrap">
+                <span class="input-addon-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </span>
+                <input
+                  v-model="newUserForm.username"
+                  type="text"
+                  class="modal-input"
+                  placeholder="例如: 家庭成员 / 极客影友"
+                  autocomplete="off" />
+              </div>
+            </div>
+
+            <!-- 登录密码 -->
+            <div class="form-group">
+              <div class="flex-between">
+                <label class="form-label">
+                  <span>登录密码</span>
+                  <span class="label-hint">(留空则自动生成 8 位强密码)</span>
+                </label>
+                <button type="button" class="btn-text-magic" @click="generateRandomPassword">
+                  ✨ 随机生成高强密码
+                </button>
+              </div>
+              <div class="input-icon-wrap">
+                <span class="input-addon-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </span>
+                <input
+                  v-model="newUserForm.password"
+                  :type="showPassword ? 'text' : 'password'"
+                  class="modal-input mono-font"
+                  placeholder="至少 6 位字符，或点击上方随机生成"
+                  autocomplete="new-password" />
+                <button
+                  type="button"
+                  class="input-action-icon"
+                  :title="showPassword ? '隐藏密码' : '查看密码'"
+                  @click="showPassword = !showPassword">
+                  <svg v-if="!showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- 用户角色与特权卡片 -->
+            <div class="form-group">
+              <label class="form-label">分配用户角色与系统权限</label>
+              <div class="role-grid">
+                <div
+                  class="role-card"
+                  :class="{ active: newUserForm.role === 'user' }"
+                  @click="newUserForm.role = 'user'">
+                  <div class="role-radio-indicator">
+                    <div class="role-radio-inner" />
+                  </div>
+                  <div class="role-content">
+                    <div class="role-title-row">
+                      <span class="role-icon">👤</span>
+                      <span class="role-title">普通用户</span>
+                      <span class="role-tag tag-user">标准权限</span>
+                    </div>
+                    <p class="role-desc">
+                      可使用全网影视搜索、网盘检索与直达、字幕下载，支持自主配置并调度个人 NAS 离线下载。
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  class="role-card"
+                  :class="{ active: newUserForm.role === 'admin' }"
+                  @click="newUserForm.role = 'admin'">
+                  <div class="role-radio-indicator">
+                    <div class="role-radio-inner" />
+                  </div>
+                  <div class="role-content">
+                    <div class="role-title-row">
+                      <span class="role-icon">🛡️</span>
+                      <span class="role-title">超级管理员</span>
+                      <span class="role-tag tag-admin">系统特权</span>
+                    </div>
+                    <p class="role-desc">
+                      除全部搜索功能外，拥有最高控制权，可管理全局用户、生成邀请码、广播公告及配置数据库。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="mb-4">
-            <label class="block text-xs font-medium text-gray-300 mb-1">登录密码 (留空自动生成)</label>
-            <input
-              v-model="newUserForm.password"
-              type="text"
-              class="w-full p-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm outline-none focus:border-emerald-500 font-mono"
-              placeholder="至少 6 位字符，留空则随机生成" />
+
+          <!-- 模式 2：开通成功凭单卡 (Success Credentials Receipt) -->
+          <div v-else class="modal-body success-receipt-body">
+            <div class="receipt-celebrate">
+              <div class="celebrate-badge">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <h4 class="celebrate-title">用户开通成功！</h4>
+              <p class="celebrate-subtitle">账号已即时持久化并同步至边缘节点，请妥善分发以下登录凭据：</p>
+            </div>
+
+            <div class="credentials-card">
+              <div class="cred-row">
+                <span class="cred-label">用户名</span>
+                <span class="cred-value font-medium">{{ createdCredential.username }}</span>
+              </div>
+              <div class="cred-row">
+                <span class="cred-label">登录邮箱</span>
+                <span class="cred-value cred-copyable" @click="copyText(createdCredential.email, '邮箱')">
+                  {{ createdCredential.email }}
+                  <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </span>
+              </div>
+              <div class="cred-row">
+                <span class="cred-label">登录密码</span>
+                <span class="cred-value cred-password cred-copyable" @click="copyText(createdCredential.password, '密码')">
+                  <span class="mono-font">{{ createdCredential.password }}</span>
+                  <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </span>
+              </div>
+              <div class="cred-row">
+                <span class="cred-label">用户角色</span>
+                <span :class="['badge', createdCredential.role === 'admin' ? 'badge-admin' : 'badge-user']">
+                  {{ createdCredential.role === 'admin' ? '超级管理员' : '普通用户' }}
+                </span>
+              </div>
+              <div class="cred-row">
+                <span class="cred-label">登录入口</span>
+                <span class="cred-value text-emerald-400 text-xs font-mono">/auth/login</span>
+              </div>
+            </div>
           </div>
-          <div class="mb-5">
-            <label class="block text-xs font-medium text-gray-300 mb-1">用户角色</label>
-            <select
-              v-model="newUserForm.role"
-              class="w-full p-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm outline-none focus:border-emerald-500">
-              <option value="user">普通用户</option>
-              <option value="admin">超级管理员</option>
-            </select>
+
+          <!-- 弹窗底栏操作 -->
+          <div class="modal-footer user-modal-footer">
+            <template v-if="!createdCredential">
+              <button type="button" class="btn-ghost" @click="closeAddUserModal">
+                取消
+              </button>
+              <button
+                type="button"
+                class="btn-primary-gradient"
+                :disabled="submittingUser"
+                @click="submitCreateUser">
+                <span v-if="submittingUser">⚡ 正在创建与同步...</span>
+                <span v-else>立即确认创建</span>
+              </button>
+            </template>
+            <template v-else>
+              <button type="button" class="btn-ghost" @click="resetNewUserForm">
+                + 继续录入
+              </button>
+              <button type="button" class="btn-primary-gradient" @click="copyAllCredentials">
+                📋 一键复制全部凭据
+              </button>
+              <button type="button" class="btn-secondary-simple" @click="closeAddUserModal">
+                完成
+              </button>
+            </template>
           </div>
-        </div>
-        <div class="modal-footer flex items-center justify-end gap-3">
-          <button class="secondary-btn" @click="showAddUserModal = false">取消</button>
-          <button
-            class="primary-btn"
-            :disabled="submittingUser"
-            @click="submitCreateUser">
-            {{ submittingUser ? '正在创建...' : '立即确认创建' }}
-          </button>
         </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- D1 数据库绑定指导弹窗 -->
     <div v-if="showD1Modal" class="modal-overlay" @click.self="showD1Modal = false">
@@ -367,6 +546,8 @@ const storageType = ref<"d1" | "memory">("memory");
 const showD1Modal = ref(false);
 const showAddUserModal = ref(false);
 const submittingUser = ref(false);
+const showPassword = ref(false);
+const createdCredential = ref<{ email: string; username: string; password: string; role: string } | null>(null);
 const newUserForm = reactive({
   email: "",
   username: "",
@@ -533,29 +714,102 @@ async function resetUserPassword(userId: string) {
   }
 }
 
+function openAddUserModal() {
+  createdCredential.value = null;
+  newUserForm.email = "";
+  newUserForm.username = "";
+  newUserForm.password = "";
+  newUserForm.role = "user";
+  showPassword.value = false;
+  showAddUserModal.value = true;
+}
+
+function closeAddUserModal() {
+  showAddUserModal.value = false;
+  createdCredential.value = null;
+}
+
+function resetNewUserForm() {
+  createdCredential.value = null;
+  newUserForm.email = "";
+  newUserForm.username = "";
+  newUserForm.password = "";
+  newUserForm.role = "user";
+  showPassword.value = false;
+}
+
+function generateRandomPassword() {
+  const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%";
+  let pass = "";
+  for (let i = 0; i < 10; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  newUserForm.password = pass;
+  showPassword.value = true;
+  showToast("已自动生成高强度随机密码");
+}
+
+async function copyText(text: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(`已复制${label}到剪贴板！`);
+  } catch {
+    showToast(`复制失败，请手动选择复制`);
+  }
+}
+
+async function copyAllCredentials() {
+  if (!createdCredential.value) return;
+  const text = [
+    "【PanHub 私有云中枢 - 账户开通凭据】",
+    `用户名: ${createdCredential.value.username}`,
+    `登录邮箱: ${createdCredential.value.email}`,
+    `登录密码: ${createdCredential.value.password}`,
+    `用户角色: ${createdCredential.value.role === "admin" ? "超级管理员" : "普通用户"}`,
+    `登录入口: https://pan.taogehome.cloud/auth/login`,
+  ].join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("已复制全部账号信息，可直接粘贴发送给用户！");
+  } catch {
+    showToast("复制失败，请手动复制");
+  }
+}
+
 async function submitCreateUser() {
-  if (!newUserForm.email.trim() || !newUserForm.username.trim()) {
+  const cleanEmail = newUserForm.email.trim().toLowerCase();
+  const cleanUsername = newUserForm.username.trim();
+  if (!cleanEmail || !cleanUsername) {
     showToast("请填写完整的邮箱与用户名");
     return;
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    showToast("请输入有效格式的电子邮箱");
+    return;
+  }
+
   submittingUser.value = true;
   try {
     const res = await $fetch<{ success: boolean; user: any; password: string }>("/api/admin/users", {
       method: "POST",
-      body: newUserForm,
+      body: {
+        email: cleanEmail,
+        username: cleanUsername,
+        password: newUserForm.password.trim(),
+        role: newUserForm.role,
+      },
     });
-    showToast(`成功创建用户 ${res.user.username}！`);
+    showToast(`成功签发用户 ${res.user.username}！`);
     users.value = mergeUsers(users.value, [res.user]);
     if (import.meta.client) {
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users.value));
     }
-    showAddUserModal.value = false;
-    const credInfo = `用户创建/录入成功！\n\n邮箱: ${res.user.email}\n密码: ${res.password}\n\n请保存此凭据以供用户登录。`;
-    newUserForm.email = "";
-    newUserForm.username = "";
-    newUserForm.password = "";
-    newUserForm.role = "user";
-    alert(credInfo);
+    createdCredential.value = {
+      email: res.user.email,
+      username: res.user.username,
+      password: res.password,
+      role: res.user.role,
+    };
     await loadData();
   } catch (err: any) {
     showToast(err.data?.message || err.message || "创建用户失败");
@@ -1009,5 +1263,470 @@ async function saveBroadcast() {
 .modal-footer {
   display: flex;
   justify-content: flex-end;
+}
+
+/* 用户录入弹窗 (Apple / Linear 现代化美学风格体系) */
+.user-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.add-user-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.add-user-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+}
+
+.user-modal-card {
+  max-width: 580px;
+  background: linear-gradient(145deg, rgba(24, 24, 28, 0.95), rgba(15, 17, 23, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 32px -4px rgba(16, 185, 129, 0.12);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 24px;
+}
+
+.header-left-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-badge-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.1));
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.25);
+}
+
+.modal-subtitle {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 3px 0 0;
+  line-height: 1.4;
+}
+
+.user-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 10px 0 4px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d1d5db;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.required-star {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.label-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 4px;
+}
+
+.btn-text-magic {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  color: #10b981;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.btn-text-magic:hover {
+  color: #34d399;
+}
+
+.input-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-addon-icon {
+  position: absolute;
+  left: 12px;
+  color: #6b7280;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 10px 14px 10px 38px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.modal-input:focus {
+  border-color: #10b981;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.modal-input::placeholder {
+  color: #4b5563;
+}
+
+.mono-font {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.5px;
+}
+
+.input-action-icon {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.input-action-icon:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.role-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.role-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.role-card.active {
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04));
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 20px -4px rgba(16, 185, 129, 0.2);
+}
+
+.role-radio-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.role-card.active .role-radio-indicator {
+  border-color: #10b981;
+}
+
+.role-card.active .role-radio-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+}
+
+.role-content {
+  flex: 1;
+}
+
+.role-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.role-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.role-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.tag-user {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.tag-admin {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.role-desc {
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* 成功凭单卡 (Credentials Receipt) */
+.success-receipt-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: 8px 0 4px;
+}
+
+.receipt-celebrate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.celebrate-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.1));
+  border: 2px solid rgba(16, 185, 129, 0.5);
+  color: #34d399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.4);
+  margin-bottom: 8px;
+}
+
+.celebrate-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.celebrate-subtitle {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 4px 0 0;
+}
+
+.credentials-card {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.cred-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.cred-label {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.cred-value {
+  color: #f3f4f6;
+}
+
+.cred-copyable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #34d399;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.08);
+  transition: all 0.2s;
+}
+
+.cred-copyable:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.cred-password {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+
+.cred-password:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.copy-icon {
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.cred-copyable:hover .copy-icon {
+  opacity: 1;
+}
+
+.user-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.btn-primary-gradient {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  border: none;
+  padding: 9px 20px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  transition: all 0.2s;
+}
+
+.btn-primary-gradient:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-primary-gradient:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #9ca3af;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-ghost:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-secondary-simple {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary-simple:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* 弹窗弹簧缩放过渡动效 */
+.modal-spring-enter-active,
+.modal-spring-leave-active {
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-spring-enter-from,
+.modal-spring-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(10px);
 }
 </style>

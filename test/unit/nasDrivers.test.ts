@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { validateNasTargetUrl } from "../../server/core/nas/ssrfGuard";
-import { testAListConnection, addAListOfflineDownload } from "../../server/core/nas/alistClient";
+import {
+  testAListConnection,
+  addAListOfflineDownload,
+  getAListStorages,
+  refreshAListPath,
+} from "../../server/core/nas/alistClient";
 import { testAria2Connection, addAria2Uri } from "../../server/core/nas/aria2Client";
 import { testQBittorrentConnection, addQBittorrentTorrent } from "../../server/core/nas/qbittorrentClient";
 import { dispatchPushTask, isCloudDriveUrl } from "../../server/core/nas/dispatcher";
@@ -73,6 +78,49 @@ describe("NAS Drivers & SSRF Security 模块测试", () => {
       );
       expect(res.success).toBe(true);
       expect(res.taskId).toBe("task_9988");
+    });
+
+    it("拉取已挂载的全部云存储驱动列表及状态", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            code: 200,
+            message: "success",
+            data: {
+              content: [
+                { id: 1, mount_path: "/115网盘", driver: "115 Cloud", status: "work", webdav_policy: "302_redirect" },
+                { id: 2, mount_path: "/夸克", driver: "QuarkTV", status: "work", webdav_policy: "302_redirect" },
+                { id: 5, mount_path: "/NAS本地盘", driver: "Local", status: "work", webdav_policy: "native_proxy" },
+              ],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await getAListStorages("https://alist.taogehome.cloud", "my-token");
+      expect(res.success).toBe(true);
+      expect(res.storages?.length).toBe(3);
+      expect(res.storages?.[0].mountPath).toBe("/115网盘");
+      expect(res.storages?.[0].status).toBe("work");
+    });
+
+    it("主动穿透刷新 AList 目录缓存", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            code: 200,
+            message: "success",
+            data: { total: 12 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await refreshAListPath("https://alist.taogehome.cloud", "my-token", "/115网盘");
+      expect(res.success).toBe(true);
+      expect(res.total).toBe(12);
+      expect(res.message).toContain("缓存已成功穿透刷新");
     });
   });
 

@@ -143,3 +143,165 @@ export async function addAListOfflineDownload(
     };
   }
 }
+
+export interface AListStorageItem {
+  id: number;
+  mountPath: string;
+  driver: string;
+  status: string;
+  remark?: string;
+  webdavPolicy?: string;
+}
+
+export interface AListStoragesResult {
+  success: boolean;
+  message: string;
+  storages?: AListStorageItem[];
+}
+
+export interface AListRefreshResult {
+  success: boolean;
+  message: string;
+  total?: number;
+}
+
+/**
+ * 获取当前 AList 中已挂载的全部云存储驱动及其健康状态
+ */
+export async function getAListStorages(
+  url: string,
+  token: string,
+  allowPrivateIp = false
+): Promise<AListStoragesResult> {
+  const check = validateNasTargetUrl(url, allowPrivateIp);
+  if (!check.valid) {
+    return { success: false, message: check.error! };
+  }
+
+  const cleanUrl = url.replace(/\/+$/, "");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  try {
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = token;
+    }
+
+    const res = await fetch(`${cleanUrl}/api/admin/storage/list`, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      return {
+        success: false,
+        message: `HTTP 响应异常 (${res.status} ${res.statusText})`,
+      };
+    }
+
+    const json = (await res.json()) as any;
+    if (json.code === 200) {
+      const content = json.data?.content || [];
+      const storages: AListStorageItem[] = content.map((s: any) => ({
+        id: s.id,
+        mountPath: s.mount_path,
+        driver: s.driver,
+        status: s.status,
+        remark: s.remark || "",
+        webdavPolicy: s.webdav_policy || "",
+      }));
+      return {
+        success: true,
+        message: "获取 AList 存储列表成功",
+        storages,
+      };
+    } else {
+      return {
+        success: false,
+        message: json.message || `AList 接口返回错误码 ${json.code}`,
+      };
+    }
+  } catch (e: any) {
+    clearTimeout(timer);
+    return {
+      success: false,
+      message: e.name === "AbortError" ? "请求 AList 存储列表超时" : `获取 AList 存储列表失败: ${e.message}`,
+    };
+  }
+}
+
+/**
+ * 主动穿透刷新 AList 指定目录的缓存 (refresh: true)
+ */
+export async function refreshAListPath(
+  url: string,
+  token: string,
+  targetPath: string,
+  allowPrivateIp = false
+): Promise<AListRefreshResult> {
+  const check = validateNasTargetUrl(url, allowPrivateIp);
+  if (!check.valid) {
+    return { success: false, message: check.error! };
+  }
+
+  const cleanUrl = url.replace(/\/+$/, "");
+  const cleanPath = targetPath.startsWith("/") ? targetPath : `/${targetPath}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = token;
+    }
+
+    const res = await fetch(`${cleanUrl}/api/fs/list`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        path: cleanPath,
+        refresh: true,
+        page: 1,
+        per_page: 1,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      return {
+        success: false,
+        message: `HTTP 响应异常 (${res.status} ${res.statusText})`,
+      };
+    }
+
+    const json = (await res.json()) as any;
+    if (json.code === 200) {
+      return {
+        success: true,
+        message: `目录 [${cleanPath}] 缓存已成功穿透刷新`,
+        total: json.data?.total || 0,
+      };
+    } else {
+      return {
+        success: false,
+        message: json.message || `刷新失败 (code: ${json.code})`,
+      };
+    }
+  } catch (e: any) {
+    clearTimeout(timer);
+    return {
+      success: false,
+      message: e.name === "AbortError" ? "刷新 AList 目录超时" : `刷新 AList 目录失败: ${e.message}`,
+    };
+  }
+}
+

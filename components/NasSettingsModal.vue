@@ -68,6 +68,18 @@
                 {{ testingAlist ? '连通性探活中...' : '⚡ 测试 AList 连通性' }}
               </button>
             </div>
+
+            <!-- 挂载存储探活列表 -->
+            <div v-if="mountedStorages.length > 0" class="col-span-2 storages-box">
+              <div class="storages-title">📂 AList 已连接云盘中枢状态：</div>
+              <div class="storage-tags">
+                <div v-for="s in mountedStorages" :key="s.id" class="storage-chip">
+                  <span class="chip-dot" :class="s.status === 'work' ? 'dot-green' : 'dot-yellow'"></span>
+                  <span class="chip-path">{{ s.mountPath }}</span>
+                  <span class="chip-driver">{{ s.driver }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -216,6 +228,18 @@ const saving = ref(false);
 const testingAlist = ref(false);
 const testingTorrent = ref(false);
 const testFeedback = ref<{ success: boolean; message: string } | null>(null);
+const mountedStorages = ref<Array<{ id: number; mountPath: string; driver: string; status: string }>>([]);
+
+async function loadStorages() {
+  try {
+    const res = await $fetch<{ success: boolean; storages: any[] }>("/api/nas/storages");
+    if (res.success && res.storages) {
+      mountedStorages.value = res.storages;
+    }
+  } catch (e) {
+    // 静默降级，不阻塞界面渲染
+  }
+}
 
 const z9xUser = ref(typeof localStorage !== "undefined" ? localStorage.getItem("panhub_z9x_user") || "admin" : "admin");
 const z9xPass = ref(typeof localStorage !== "undefined" ? localStorage.getItem("panhub_z9x_pass") || "" : "");
@@ -234,6 +258,7 @@ watch(
   async (v) => {
     if (v) {
       testFeedback.value = null;
+      loadStorages();
       try {
         const res = await $fetch<{ profile: any }>("/api/nas/profile");
         if (res.profile) {
@@ -270,6 +295,9 @@ async function testAlist() {
       },
     });
     testFeedback.value = res;
+    if (res.success) {
+      loadStorages();
+    }
   } catch (err: any) {
     testFeedback.value = {
       success: false,
@@ -705,5 +733,62 @@ function copyText(text: string) {
   padding: 1px 4px;
   border-radius: 3px;
   font-family: monospace;
+}
+
+.storages-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 4px;
+}
+
+.storages-title {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.storage-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.storage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dot-green {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.dot-yellow {
+  background: #f59e0b;
+}
+
+.chip-path {
+  color: #e5e7eb;
+  font-weight: 600;
+}
+
+.chip-driver {
+  color: #9ca3af;
+  font-size: 10px;
 }
 </style>

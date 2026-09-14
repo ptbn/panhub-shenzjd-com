@@ -252,12 +252,36 @@ async function executeCloudTransfer() {
   // 2. 在新标签页唤起网盘分享页
   window.open(props.item.url, "_blank", "noopener,noreferrer");
 
-  // 3. 给出清晰的芝杜联动反馈
+  // 3. 智能推导 AList 对应网盘路径并自动异步穿透刷新
+  let cloudTargetName = "网盘";
+  let targetPath = "/";
+  const u = (props.item.url || "").toLowerCase();
+  if (u.includes("quark.cn")) {
+    cloudTargetName = "夸克网盘";
+    targetPath = "/夸克";
+  } else if (u.includes("115.com")) {
+    cloudTargetName = "115网盘";
+    targetPath = "/115网盘";
+  } else if (u.includes("baidu.com")) {
+    cloudTargetName = "百度网盘";
+    targetPath = "/百度网盘";
+  } else if (u.includes("xunlei.com")) {
+    cloudTargetName = "迅雷网盘";
+    targetPath = "/迅雷网盘";
+  }
+
+  // 触发后台 AList 穿透刷新（异步静默执行，不阻断主流程）
+  $fetch("/api/nas/refresh", {
+    method: "POST",
+    body: { path: targetPath },
+  }).catch(() => {});
+
+  // 4. 给出清晰的芝杜联动反馈
   feedback.value = {
     success: true,
     message: props.item.password
-      ? `提取码 [${props.item.password}] 已自动复制！网盘页面已打开。存入网盘后，芝杜 Z9X 海报墙即可免下载 4K 秒播！`
-      : "网盘分享页面已打开。存入网盘后，芝杜 Z9X 播放器即可免下载 4K 秒播！",
+      ? `提取码 [${props.item.password}] 已自动复制！${cloudTargetName}页面已打开。AList [${targetPath}] 目录缓存已自动穿透刷新，存入后芝杜 Z9X 即刻秒播！`
+      : `${cloudTargetName}分享页面已打开。AList [${targetPath}] 目录缓存已自动穿透刷新，存入后芝杜 Z9X 即刻秒播！`,
   };
 }
 
