@@ -179,3 +179,101 @@ export async function decryptCredential(
   const dec = new TextDecoder();
   return dec.decode(plainBuffer);
 }
+
+function stringToBase64Url(str: string): string {
+  const enc = new TextEncoder();
+  const bytes = enc.encode(str);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlToString(b64url: string): string {
+  let b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4 !== 0) {
+    b64 += "=";
+  }
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/**
+ * 跨节点自包含签名 Session Token：
+ * 采用 Web Crypto HMAC-SHA256 对用户身份 payload 进行签名
+ * 解决分布式/Serverless 多节点无状态隔离导致的 Session 丢失问题
+ */
+export async function signSessionToken(
+  user: { id: string; email: string; username: string; role: string },
+  secret: string = "panhub-cluster-session-secret-2026"
+): Promise<string> {
+  const enc = new TextEncoder();
+  const payload = JSON.stringify({
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    role: user.role,
+    exp: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30天
+  });
+  const dataB64 = stringToBase64Url(payload);
+  const key = await subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sigBuffer = await subtle.sign("HMAC", key, enc.encode(dataB64));
+  const sigHex = bytesToHex(new Uint8Array(sigBuffer));
+  return `${dataB64}.${sigHex}`;
+}
+
+export async function verifySessionToken(
+  token: string,
+  secret: string = "panhub-cluster-session-secret-2026"
+): Promise<{ id: string; email: string; username: string; role: "admin" | "user"; status: "active"; createdAt: number; lastActiveAt: number } | null> {
+  if (!token || !token.includes(".")) return null;
+  const [dataB64, sigHex] = token.split(".");
+  if (!dataB64 || !sigHex) return null;
+
+  try {
+    const enc = new TextEncoder();
+    const key = await subtle.importKey(
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const valid = await subtle.verify(
+      "HMAC",
+      key,
+      hexToBytes(sigHex),
+      enc.encode(dataB64)
+    );
+    if (!valid) return null;
+
+    const json = base64UrlToString(dataB64);
+    const parsed = JSON.parse(json);
+    if (parsed.exp && parsed.exp < Date.now()) {
+      return null;
+    }
+    return {
+      id: parsed.id,
+      email: parsed.email,
+      username: parsed.username,
+      role: parsed.role,
+      status: "active",
+      createdAt: parsed.createdAt || 1789361929784,
+      lastActiveAt: Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+

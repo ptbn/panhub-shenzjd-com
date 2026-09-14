@@ -29,6 +29,7 @@ export async function getDatabase(event?: any): Promise<DatabaseAdapter> {
 
   // 本地开发 / 测试环境降级为纯 TS 内存驱动
   const mem = getMemoryDatabase();
+  await mem.init();
   return mem;
 }
 

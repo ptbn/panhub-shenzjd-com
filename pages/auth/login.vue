@@ -35,6 +35,14 @@
         </button>
       </div>
 
+      <!-- 成功提示 -->
+      <div v-if="successMessage" class="success-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 6L9 17l-5-5"></path>
+        </svg>
+        <span>{{ successMessage }}</span>
+      </div>
+
       <!-- 错误提示 -->
       <div v-if="errorMessage" class="error-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -53,7 +61,7 @@
             v-model="loginForm.email"
             type="email"
             required
-            placeholder="admin@taogehome.cloud"
+            placeholder="383004858@qq.com"
             autocomplete="username" />
         </div>
         <div class="form-item">
@@ -88,7 +96,7 @@
             v-model="regForm.email"
             type="email"
             required
-            placeholder="your-name@taogehome.cloud"
+            placeholder="383004858@qq.com"
             autocomplete="email" />
         </div>
         <div class="form-item">
@@ -130,15 +138,16 @@ const mode = ref<"login" | "register">("login");
 const isBootstrap = ref(false);
 const submitting = ref(false);
 const errorMessage = ref("");
+const successMessage = ref("");
 
 const loginForm = reactive({
-  email: "",
+  email: "383004858@qq.com",
   password: "",
 });
 
 const regForm = reactive({
-  username: "",
-  email: "",
+  username: "twisper",
+  email: "383004858@qq.com",
   password: "",
   inviteCode: "",
 });
@@ -158,14 +167,18 @@ onMounted(async () => {
 async function handleLogin() {
   submitting.value = true;
   errorMessage.value = "";
+  successMessage.value = "";
   try {
     await $fetch("/api/auth/login", {
       method: "POST",
       body: loginForm,
     });
+    successMessage.value = "登录成功，正在前往主页...";
     await fetchUser();
     const redirect = (route.query.redirect as string) || "/";
-    router.push(redirect);
+    setTimeout(() => {
+      window.location.href = redirect;
+    }, 300);
   } catch (err: any) {
     errorMessage.value = err.data?.message || err.message || "登录失败，请检查邮箱与密码";
   } finally {
@@ -176,14 +189,18 @@ async function handleLogin() {
 async function handleRegister() {
   submitting.value = true;
   errorMessage.value = "";
+  successMessage.value = "";
   try {
     await $fetch("/api/auth/register", {
       method: "POST",
       body: regForm,
     });
+    successMessage.value = "账号创建成功，正在前往主页...";
     await fetchUser();
     const redirect = (route.query.redirect as string) || "/";
-    router.push(redirect);
+    setTimeout(() => {
+      window.location.href = redirect;
+    }, 300);
   } catch (err: any) {
     errorMessage.value = err.data?.message || err.message || "注册失败，请检查邀请码与输入";
   } finally {
@@ -286,6 +303,19 @@ async function handleRegister() {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   font-weight: 600;
+}
+
+.success-box {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
 }
 
 .error-box {

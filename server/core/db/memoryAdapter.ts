@@ -13,6 +13,18 @@ import type {
   UserRole,
 } from "./types";
 
+export const DEFAULT_ADMIN_USER: UserRecord = {
+  id: "u_admin_twisper",
+  email: "383004858@qq.com",
+  username: "twisper",
+  passwordSalt: "0d5ebadf351bedd7b60342138db0b8b6",
+  passwordHash: "60a76d4bb3ca42331a13bb64313e8126d30114df383e6c7c7aa611bf0fad10ab",
+  role: "admin",
+  status: "active",
+  createdAt: 1789361929784,
+  lastActiveAt: 1789361929784,
+};
+
 export class MemoryDatabaseAdapter implements DatabaseAdapter {
   private users = new Map<string, UserRecord>();
   private sessions = new Map<string, SessionRecord>();
@@ -22,7 +34,9 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
   private announcement: AnnouncementRecord | null = null;
 
   async init(): Promise<void> {
-    // 内存存储无需初始化表结构
+    if (this.users.size === 0) {
+      this.users.set(DEFAULT_ADMIN_USER.id, { ...DEFAULT_ADMIN_USER });
+    }
   }
 
   // Users

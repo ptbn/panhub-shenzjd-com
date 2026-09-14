@@ -59,4 +59,27 @@ describe("Web Crypto 安全模块测试 (纯 JS/TS 零 C++ 依赖)", () => {
     const encrypted = await encryptCredential(plainText, masterSecret);
     await expect(decryptCredential(encrypted, wrongSecret)).rejects.toThrow();
   });
+
+  it("自包含 HMAC-SHA256 Session 签名与验证闭环", async () => {
+    const { signSessionToken, verifySessionToken } = await import("../../server/core/db/crypto");
+    const userPayload = {
+      id: "u_test_123",
+      email: "test@qq.com",
+      username: "Tester",
+      role: "admin" as const,
+    };
+
+    const token = await signSessionToken(userPayload);
+    expect(token).toContain(".");
+
+    const verified = await verifySessionToken(token);
+    expect(verified).not.toBeNull();
+    expect(verified?.id).toBe(userPayload.id);
+    expect(verified?.email).toBe(userPayload.email);
+    expect(verified?.role).toBe("admin");
+
+    // 篡改 Token 签名应当验证失败
+    const tampered = token.slice(0, -4) + "abcd";
+    expect(await verifySessionToken(tampered)).toBeNull();
+  });
 });
