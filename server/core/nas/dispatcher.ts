@@ -97,8 +97,13 @@ export async function dispatchPushTask(
       }
     }
 
-    // 智能合成路径：若用户未指定，且默认路径存在，附加分类子目录
-    let targetPath = task.targetDir || (profile.alistDefaultPath ? resolveSmartSubdir(profile.alistDefaultPath, task.category) : "/我的网盘");
+    // 智能合成路径：若用户未指定或前端传入旧 /Media 路径，平滑映射为真实存在的挂载点
+    let targetPath = task.targetDir;
+    if (!targetPath || targetPath.startsWith("/Media")) {
+      targetPath = profile.alistDefaultPath
+        ? resolveSmartSubdir(profile.alistDefaultPath, task.category)
+        : "/NAS本地盘/电影";
+    }
 
     // 动态选择 AList 离线下载驱动：如果任务显式偏好 qBittorrent，或 profile 设置了 qbittorrent，传递 "qBittorrent"
     const alistOfflineTool =
@@ -168,9 +173,12 @@ export async function dispatchPushTask(
         }
       }
 
-      let targetPath =
-        task.targetDir ||
-        (profile.alistDefaultPath ? resolveSmartSubdir(profile.alistDefaultPath, task.category) : "/NAS本地盘");
+      let targetPath = task.targetDir;
+      if (!targetPath || targetPath.startsWith("/Media")) {
+        targetPath = profile.alistDefaultPath
+          ? resolveSmartSubdir(profile.alistDefaultPath, task.category)
+          : "/NAS本地盘/电影";
+      }
 
       const res = await addAListOfflineDownload(
         profile.alistUrl,

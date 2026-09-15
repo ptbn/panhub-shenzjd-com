@@ -325,8 +325,8 @@ if (import.meta.client) {
 
 const form = reactive({
   category: "movie" as "movie" | "tv" | "anime" | "other",
-  preferredClient: "auto" as "auto" | "alist" | "aria2" | "qbittorrent",
-  targetDir: "/Media/Movies",
+  preferredClient: "qbittorrent" as "auto" | "alist" | "aria2" | "qbittorrent",
+  targetDir: "/NAS本地盘/电影",
 });
 
 const isCloud = computed(() => {
