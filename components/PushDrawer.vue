@@ -144,16 +144,19 @@
               <div class="z9x-steps">
                 <div class="step-item">
                   <span class="step-num">1</span>
-                  <div class="step-text">该网盘暂不支持直接免转存挂载。请先点击下方<b>「① 打开网盘转存 (带提取码)」</b>，存入您网盘的影视目录；</div>
+                  <div class="step-text">受网盘官方安全机制限制，需由您在官方页面保存：点击下方<b>「① 打开网盘转存 (带提取码)」</b>，前往网盘点击<b>【保存到我的网盘】</b>；</div>
                 </div>
                 <div class="step-item">
                   <span class="step-num">2</span>
-                  <div class="step-text">转存成功后，点击下方<b>「② 存入后穿透刷新 AList」</b>，系统自动穿透刷新对应目录缓存；</div>
+                  <div class="step-text">在网盘中保存成功后，返回此处点击<b>「② 存入后穿透刷新 AList」</b>，系统立即通知 AList 穿透刷新该目录缓存；</div>
                 </div>
                 <div class="step-item">
                   <span class="step-num">3</span>
                   <div class="step-text"><b>芝杜 Z9X 海报墙将即刻自动识别并原画直映</b>，畅享 4K 极速秒播。</div>
                 </div>
+              </div>
+              <div class="transfer-notice">
+                💡 <b>特别提醒</b>：迅雷/夸克官方有安全风控，需由您在打开的官方网页中点击<b>【保存到网盘】</b>。保存完毕后，点击下方第 ② 步即可通知 AList 穿透同步并在芝杜播放。
               </div>
             </div>
           </template>
@@ -564,8 +567,8 @@ async function copyAndOpenShare() {
   feedback.value = {
     success: true,
     message: props.item.password
-      ? `提取码 [${props.item.password}] 已自动复制！网盘分享页面已在新标签页打开。`
-      : "网盘分享页面已在新标签页打开。",
+      ? `提取码 [${props.item.password}] 已自动复制！已在新标签页打开网盘，请点击【保存到我的网盘】，保存完成后返回此处点击第②步。`
+      : "已在新标签页打开网盘，请点击【保存到我的网盘】，保存完成后返回此处点击第②步。",
   };
 }
 
@@ -603,7 +606,7 @@ async function triggerManualRefresh() {
     });
     feedback.value = {
       success: true,
-      message: res.message || `✅ AList 目录 [${res.path || targetPath}] 缓存已成功穿透刷新，芝杜海报墙已同步最新文件！`,
+      message: res.message || `✅ AList 目录 [${res.path || targetPath}] 缓存已成功穿透刷新！若您已在网盘中点击了【保存】，芝杜海报墙此时已能秒播；若尚未保存，请先点击第①步打开网盘保存！`,
     };
   } catch (e: any) {
     let msg = e.data?.message || e.message || "刷新 AList 目录失败，请检查 AList 状态";
@@ -1051,6 +1054,21 @@ async function executePush() {
 
 .step-text b {
   color: #34d399;
+}
+
+.transfer-notice {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #fbbf24;
+  line-height: 1.45;
+}
+
+.transfer-notice b {
+  color: #fef3c7;
 }
 
 .quick-links {
