@@ -192,5 +192,66 @@ describe("方案 A：AList 动态分享挂载 (Share Mount) 驱动测试", () =>
       expect(res.success).toBe(true);
       expect(res.mountPath).toBe("/twisper/影视挂载/星际穿越");
     });
+
+    it("当百度分享因 errno: 2 初始化失败且创建了残存存储时，自动清理僵尸存储并友好提示", async () => {
+      const fetchMock = vi.spyOn(globalThis, "fetch")
+        // 1. getAListStorages (初始检查，无旧挂载)
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ code: 200, message: "success", data: { content: [] } }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        )
+        // 2. storage/create 失败但 AList 报 failed init storage but storage is already created
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              code: 500,
+              message: 'failed init storage but storage is already created: failed init storage: 200 OK; {"errno":2,"data":{"list":[]}}',
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        )
+        // 3. getAListStorages (清理时重新检查，发现刚才创建的残留 storage ID 101)
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              code: 200,
+              message: "success",
+              data: {
+                content: [
+                  { id: 101, mount_path: "/twisper/影视挂载/失败资源", driver: "BaiduShare" },
+                ],
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        )
+        // 4. storage/delete?id=101 -> 成功清理
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ code: 200, message: "success" }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        );
+
+      const res = await mountAListShare(
+        "https://alist.taogehome.cloud",
+        "token-123",
+        "https://pan.baidu.com/s/1invalid-link?pwd=wrong",
+        "",
+        "/twisper/影视挂载/失败资源"
+      );
+
+      expect(res.success).toBe(false);
+      expect(res.message).toContain("百度网盘接口提示【errno: 2 参数错误/资源失效】");
+      expect(res.message).toContain("已自动为您清理失败的挂载点");
+
+      // 断言调用了删除接口清理残留
+      const deleteCall = fetchMock.mock.calls.find((c) =>
+        String(c[0]).includes("/api/admin/storage/delete?id=101")
+      );
+      expect(deleteCall).toBeDefined();
+    });
   });
 });

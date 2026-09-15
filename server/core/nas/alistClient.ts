@@ -240,6 +240,54 @@ export async function getAListStorages(
 }
 
 /**
+ * 删除 AList 中的指定存储挂载项 (用于清理失效或初始化失败的挂载点)
+ */
+export async function deleteAListStorage(
+  url: string,
+  token: string,
+  storageId: number,
+  allowPrivateIp = false
+): Promise<{ success: boolean; message: string }> {
+  const check = validateNasTargetUrl(url, allowPrivateIp);
+  if (!check.valid) {
+    return { success: false, message: check.error! };
+  }
+
+  const cleanUrl = url.replace(/\/+$/, "");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  try {
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = token;
+    }
+
+    const res = await fetch(`${cleanUrl}/api/admin/storage/delete?id=${storageId}`, {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      return { success: false, message: `删除存储接口异常 (${res.status})` };
+    }
+
+    const json = (await res.json()) as any;
+    return {
+      success: json.code === 200,
+      message: json.message || (json.code === 200 ? "删除存储成功" : `删除失败: ${json.code}`),
+    };
+  } catch (e: any) {
+    clearTimeout(timer);
+    return { success: false, message: `删除存储请求失败: ${e.message}` };
+  }
+}
+
+/**
  * 主动穿透刷新 AList 指定目录的缓存 (refresh: true)
  */
 export async function refreshAListPath(
@@ -518,9 +566,35 @@ export async function mountAListShare(
 
     const json = (await res.json()) as any;
     if (json.code !== 200) {
+      const rawMsg = String(json.message || "");
+
+      // 若初始化驱动失败但存储已被 AList 建立 (storage is already created)，立即自动回收删除该僵尸存储
+      if (rawMsg.includes("storage is already created") || rawMsg.includes("failed init storage")) {
+        try {
+          const checkList = await getAListStorages(url, token, allowPrivateIp);
+          const zombie = checkList.storages?.find((s) => s.mountPath === cleanPath);
+          if (zombie && zombie.id) {
+            await deleteAListStorage(url, token, zombie.id, allowPrivateIp);
+            console.info(`[AList Mount] 已自动清理初始化失败的僵尸挂载点: [${cleanPath}] (ID: ${zombie.id})`);
+          }
+        } catch (cleanErr) {
+          console.warn("[AList Mount] 自动清理僵尸挂载点失败:", cleanErr);
+        }
+      }
+
+      // 针对网盘特有的常见错误进行中文语义降级转化
+      let friendlyMsg = rawMsg || `挂载失败 (错误码: ${json.code})`;
+      if (rawMsg.includes('"errno":2') || rawMsg.includes('"errno": 2')) {
+        friendlyMsg = "百度网盘接口提示【errno: 2 参数错误/资源失效】。可能原因：该分享已取消或失效、提取码错误，或触发了百度官方反爬风控（要求登录个人账号）。已自动为您清理失败的挂载点。";
+      } else if (rawMsg.includes('"errno":9019') || rawMsg.includes("need verify")) {
+        friendlyMsg = "百度网盘接口触发官方安全验证（need verify），官方禁止免密解析。已自动为您清理失败的挂载点。";
+      } else if (rawMsg.includes("failed init storage")) {
+        friendlyMsg = "网盘分享驱动初始化失败，该分享可能已被取消或受官方防盗链限制。已自动为您清理失败的挂载点。";
+      }
+
       return {
         success: false,
-        message: json.message || `挂载失败 (错误码: ${json.code})`,
+        message: friendlyMsg,
       };
     }
 

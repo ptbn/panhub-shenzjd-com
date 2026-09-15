@@ -543,10 +543,13 @@ async function executeMountShare() {
       message: `🎉 已成功动态挂载至 AList：${res.mountPath}，芝杜海报墙与播放器即刻秒播！`,
     };
   } catch (err: any) {
-    const rawMsg = err.data?.message || err.message || "AList 动态挂载失败";
+    let rawMsg = err.data?.message || err.message || "AList 动态挂载失败";
+    if (rawMsg.includes('"errno":2') || rawMsg.includes('"errno": 2')) {
+      rawMsg = "百度网盘接口提示【errno: 2 参数错误/资源失效】。可能原因：该分享已取消或失效、提取码错误，或触发了百度官方反爬风控（要求登录个人账号）。已自动为您清理失败挂载点。";
+    }
     feedback.value = {
       success: false,
-      message: `${rawMsg}。该分享可能受官方防盗链限制或需网盘Cookie，建议点击下方【打开网盘分享页/转存】存入个人盘后点击【转存后穿透刷新 AList】！`,
+      message: `${rawMsg} 建议点击下方【🌐 打开网盘分享页 (带提取码)】存入个人盘后，点击【🔄 转存后穿透刷新 AList】！`,
     };
   } finally {
     mounting.value = false;
