@@ -272,5 +272,70 @@ describe("NAS Drivers & SSRF Security 模块测试", () => {
       expect(logs[0].title).toBe("绝命毒师 全五季 1080p");
       expect(logs[0].protocol).toBe("aria2");
     });
+
+    it("磁力链接在未配置独立 qB 域名时，自动通过已绑定的 AList 以 tool: qBittorrent 安全下发", async () => {
+      const profile: NasProfileRecord = {
+        id: "p2",
+        userId: "u2",
+        name: "绿联 DX4600 (方案 A 局域网闭环)",
+        isDefault: 1,
+        cloudDriveEnabled: 1,
+        alistUrl: "https://alist.taogehome.cloud",
+        alistTokenEncrypted: "",
+        alistDefaultPath: "/NAS本地盘",
+        torrentClientType: "qbittorrent",
+        torrentClientUrl: "", // 未配置独立公网域名
+        torrentClientSecretEncrypted: "",
+        torrentDefaultDir: "/NAS本地盘/电影",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      // Mock AList /api/fs/add_offline_download 响应
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            code: 200,
+            message: "success",
+            data: { tasks: [{ id: "qbit_task_999" }] },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
+
+      const pushRes = await dispatchPushTask(
+        profile,
+        {
+          title: "肖申克的救赎 4K Remux",
+          url: "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+          category: "movie",
+          preferredClient: "qbittorrent",
+        },
+        masterSecret,
+        db,
+        "涛哥"
+      );
+
+      expect(pushRes.success).toBe(true);
+      expect(pushRes.protocol).toBe("qbittorrent");
+      expect(pushRes.targetPath).toBe("/NAS本地盘/电影");
+
+      // 验证调用的 AList 接口载荷中 tool 必须为 "qBittorrent"
+      expect(fetchSpy).toHaveBeenCalled();
+      const lastCall = fetchSpy.mock.calls[0];
+      expect(lastCall[0]).toBe("https://alist.taogehome.cloud/api/fs/add_offline_download");
+      const requestBody = JSON.parse((lastCall[1] as any).body);
+      expect(requestBody.tool).toBe("qBittorrent");
+      expect(requestBody.urls[0]).toBe("magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12");
+
+      // 验证审计日志
+      const logs = await db.listPushLogsByUser("u2");
+      expect(logs).toHaveLength(1);
+      expect(logs[0].title).toBe("肖申克的救赎 4K Remux");
+      expect(logs[0].protocol).toBe("qbittorrent");
+    });
   });
 });

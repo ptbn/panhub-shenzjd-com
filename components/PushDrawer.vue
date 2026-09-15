@@ -205,7 +205,7 @@
               </label>
               <label class="engine-option">
                 <input v-model="form.preferredClient" type="radio" value="qbittorrent" />
-                <span>qBittorrent (推荐)</span>
+                <span>qBittorrent (推荐 · AList 内网联动)</span>
               </label>
             </div>
           </div>
@@ -451,7 +451,17 @@ function computeSmartTargetDir(category: "movie" | "tv" | "anime" | "other"): st
     }
     return `/${sub}`;
   }
-  return `/Media/${enSub}`;
+
+  // 磁力类资源：若已配置 AList 专属挂载目录（如 /NAS本地盘），优先对齐该目录，确保 AList 与绿联云影院直接入库
+  if (
+    userDefaultPath.value &&
+    userDefaultPath.value !== "/" &&
+    userDefaultPath.value !== "/我的影视挂载" &&
+    userDefaultPath.value !== "/我的网盘/电影"
+  ) {
+    return `${userDefaultPath.value.replace(/\/+$/, "")}/${sub}`;
+  }
+  return `/NAS本地盘/${sub}`;
 }
 
 function updateTargetDir() {

@@ -100,12 +100,18 @@ export async function dispatchPushTask(
     // 智能合成路径：若用户未指定，且默认路径存在，附加分类子目录
     let targetPath = task.targetDir || (profile.alistDefaultPath ? resolveSmartSubdir(profile.alistDefaultPath, task.category) : "/我的网盘");
 
+    // 动态选择 AList 离线下载驱动：如果任务显式偏好 qBittorrent，或 profile 设置了 qbittorrent，传递 "qBittorrent"
+    const alistOfflineTool =
+      task.preferredClient === "qbittorrent" || (!isCloud && profile.torrentClientType === "qbittorrent")
+        ? "qBittorrent"
+        : "aria2";
+
     const res = await addAListOfflineDownload(
       profile.alistUrl,
       token,
       task.url,
       targetPath,
-      "aria2",
+      alistOfflineTool,
       allowPrivateIp
     );
 
@@ -151,39 +157,73 @@ export async function dispatchPushTask(
     };
   } else {
     // qbittorrent
-    if (!profile.torrentClientUrl) {
-      throw new Error("尚未配置 qBittorrent 地址，请先在【我的 NAS】中进行配置");
-    }
-
-    let secret = "";
-    if (profile.torrentClientSecretEncrypted) {
-      try {
-        secret = await decryptCredential(profile.torrentClientSecretEncrypted, masterSecret);
-      } catch (e) {
-        console.warn("[Dispatcher] qBittorrent 密码解密警告");
+    // 方案 A 优先闭环：若用户未配置 qB 独立的公网 RPC 地址，但已配置 AList，则自动降级通过 AList 离线接口以 qBittorrent 驱动下发！
+    if (!profile.torrentClientUrl && profile.alistUrl) {
+      let token = "";
+      if (profile.alistTokenEncrypted) {
+        try {
+          token = await decryptCredential(profile.alistTokenEncrypted, masterSecret);
+        } catch (e) {
+          console.warn("[Dispatcher] AList token 解密警告，尝试以空 Token 访问");
+        }
       }
+
+      let targetPath =
+        task.targetDir ||
+        (profile.alistDefaultPath ? resolveSmartSubdir(profile.alistDefaultPath, task.category) : "/NAS本地盘");
+
+      const res = await addAListOfflineDownload(
+        profile.alistUrl,
+        token,
+        task.url,
+        targetPath,
+        "qBittorrent",
+        allowPrivateIp
+      );
+
+      finalResult = {
+        success: res.success,
+        protocol: "qbittorrent",
+        taskId: res.taskId,
+        message: res.message || "磁力任务已成功提交至 AList -> qBittorrent 离线下载队列",
+        targetPath,
+        targetDevice: profile.name || "家庭 NAS",
+      };
+    } else {
+      if (!profile.torrentClientUrl) {
+        throw new Error("尚未配置 qBittorrent 地址或 AList 节点，请先在【我的 NAS】中进行配置");
+      }
+
+      let secret = "";
+      if (profile.torrentClientSecretEncrypted) {
+        try {
+          secret = await decryptCredential(profile.torrentClientSecretEncrypted, masterSecret);
+        } catch (e) {
+          console.warn("[Dispatcher] qBittorrent 密码解密警告");
+        }
+      }
+
+      let targetDir = task.targetDir || profile.torrentDefaultDir || "/Media/Movies";
+      const sub = inferCategorySubdir(task.category);
+
+      const res = await addQBittorrentTorrent(
+        profile.torrentClientUrl,
+        "admin",
+        secret || undefined,
+        [task.url],
+        targetDir,
+        sub,
+        allowPrivateIp
+      );
+
+      finalResult = {
+        success: res.success,
+        protocol: "qbittorrent",
+        message: res.message,
+        targetPath: targetDir,
+        targetDevice: profile.name || "家庭 NAS",
+      };
     }
-
-    let targetDir = task.targetDir || profile.torrentDefaultDir || "/Media/Movies";
-    const sub = inferCategorySubdir(task.category);
-
-    const res = await addQBittorrentTorrent(
-      profile.torrentClientUrl,
-      "admin",
-      secret || undefined,
-      [task.url],
-      targetDir,
-      sub,
-      allowPrivateIp
-    );
-
-    finalResult = {
-      success: res.success,
-      protocol: "qbittorrent",
-      message: res.message,
-      targetPath: targetDir,
-      targetDevice: profile.name || "家庭 NAS",
-    };
   }
 
   // 记录审计日志

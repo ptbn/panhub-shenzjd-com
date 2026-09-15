@@ -195,7 +195,10 @@
                 v-model="form.torrentClientUrl"
                 type="url"
                 class="input-field"
-                :placeholder="form.torrentClientType === 'aria2' ? 'https://aria2.taogehome.cloud/jsonrpc' : 'https://qb.taogehome.cloud'" />
+                :placeholder="form.torrentClientType === 'aria2' ? 'https://aria2.taogehome.cloud/jsonrpc' : 'https://qb.taogehome.cloud (若与 AList 联动此处可留空)'" />
+              <p v-if="form.torrentClientType === 'qbittorrent'" class="field-subhint font-mono">
+                💡 若已在 AList 后台配置 qBittorrent，此处留空即可自动经由 AList 安全隧道免公网调度。
+              </p>
             </div>
             <div class="form-item">
               <label>RPC 密钥 / Web 密码 {{ form.torrentHasSecret ? '(已保存密文)' : '' }}</label>
