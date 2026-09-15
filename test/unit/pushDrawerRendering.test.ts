@@ -83,6 +83,34 @@ describe("PushDrawer 前端状态机与能力分流断言", () => {
     expect(state.canShareMount).toBe(false);
   });
 
+  it("磁力/BT 面板严格执行三级安全门禁 (未登录 -> 未配置 -> 允许推送)", () => {
+    function computeBtButtonState(isAuthenticated: boolean, alistConfigured: boolean) {
+      if (!isAuthenticated) {
+        return { gate: "unauth", buttonText: "🔒 请先登录账号" };
+      }
+      if (!alistConfigured) {
+        return { gate: "unconfigured", buttonText: "⚙️ 前往配置我的 NAS" };
+      }
+      return { gate: "ready", buttonText: "📥 立即推送到 NAS" };
+    }
+
+    // 1. 会话过期或未登录
+    expect(computeBtButtonState(false, false)).toEqual({
+      gate: "unauth",
+      buttonText: "🔒 请先登录账号",
+    });
+    // 2. 已登录但尚未配置 AList / NAS
+    expect(computeBtButtonState(true, false)).toEqual({
+      gate: "unconfigured",
+      buttonText: "⚙️ 前往配置我的 NAS",
+    });
+    // 3. 已登录且已配置 NAS
+    expect(computeBtButtonState(true, true)).toEqual({
+      gate: "ready",
+      buttonText: "📥 立即推送到 NAS",
+    });
+  });
+
   describe("动态落盘与转存目录推导 (彻底杜绝 /我的网盘 假目录)", () => {
     function computeTargetDir(
       itemUrl: string,

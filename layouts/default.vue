@@ -227,6 +227,7 @@ import NasSettingsModal from "../components/NasSettingsModal.vue";
 const { loadSettings } = useSettings();
 const { isDark, toggle: toggleTheme } = useDarkMode();
 const { user, isAdmin, logout } = useAuth();
+const { loadProfile } = useNasProfile();
 
 const currentNav = ref("home");
 const mobileMenuOpen = ref(false);
@@ -254,6 +255,9 @@ function scrollToSection(id: string) {
 
 onMounted(() => {
   loadSettings();
+  if (user.value) {
+    loadProfile().catch(() => {});
+  }
 });
 </script>
 

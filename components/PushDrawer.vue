@@ -54,6 +54,17 @@
             </div>
           </div>
 
+          <!-- 门禁 1.5：正在同步云端 D1 NAS 配置 (防闪烁) -->
+          <div v-else-if="checkingProfile && !alistConfigured" class="gate-card loading-gate">
+            <div class="gate-icon">
+              <span class="spinner-large"></span>
+            </div>
+            <div class="gate-content">
+              <div class="gate-title">正在同步云端 D1 NAS 节点配置...</div>
+              <div class="gate-desc">正在拉取您的家庭 AList 与芝杜挂载配置，请稍候。</div>
+            </div>
+          </div>
+
           <!-- 门禁 2：已登录但未配置 AList -->
           <div v-else-if="!alistConfigured" class="gate-card unconfigured">
             <div class="gate-icon">⚙️</div>
@@ -163,69 +174,109 @@
         </div>
 
         <!-- 磁力类资源：下载器调度面板 -->
-        <template v-else>
-          <!-- 智能分类预设 -->
-          <div class="form-group">
-            <label class="group-label">影视媒体分类 (智能识别)</label>
-            <div class="category-chips">
-              <button
-                type="button"
-                :class="['chip', { active: form.category === 'movie' }]"
-                @click="setCategory('movie')">
-                🎬 电影 (Movies)
-              </button>
-              <button
-                type="button"
-                :class="['chip', { active: form.category === 'tv' }]"
-                @click="setCategory('tv')">
-                📺 电视剧 (TV)
-              </button>
-              <button
-                type="button"
-                :class="['chip', { active: form.category === 'anime' }]"
-                @click="setCategory('anime')">
-                🌸 动漫 (Anime)
-              </button>
-              <button
-                type="button"
-                :class="['chip', { active: form.category === 'other' }]"
-                @click="setCategory('other')">
-                📁 其他文件
-              </button>
+        <div v-else class="torrent-panel">
+          <!-- 门禁 1：未登录提示 -->
+          <div v-if="!isAuthenticated" class="gate-card unauth">
+            <div class="gate-icon">🔒</div>
+            <div class="gate-content">
+              <div class="gate-title">推送至 NAS 离线下载需先登录账号</div>
+              <div class="gate-desc">登录后即可将种子/磁力自动下发至内网 qBittorrent / Aria2 并自动入库芝杜与绿联云影院海报墙。</div>
+              <div class="gate-actions">
+                <a href="/auth/login" class="gate-btn primary">立即登录 / 注册</a>
+              </div>
             </div>
           </div>
 
-          <!-- 下载器选择 -->
-          <div class="form-group">
-            <label class="group-label">调度下载器驱动</label>
-            <div class="engine-selector">
-              <label class="engine-option">
-                <input v-model="form.preferredClient" type="radio" value="aria2" />
-                <span>Aria2 下载</span>
-              </label>
-              <label class="engine-option">
-                <input v-model="form.preferredClient" type="radio" value="qbittorrent" />
-                <span>qBittorrent (推荐 · AList 内网联动)</span>
-              </label>
+          <!-- 门禁 1.5：正在同步云端 D1 NAS 配置 (防闪烁) -->
+          <div v-else-if="checkingProfile && !alistConfigured" class="gate-card loading-gate">
+            <div class="gate-icon">
+              <span class="spinner-large"></span>
+            </div>
+            <div class="gate-content">
+              <div class="gate-title">正在同步云端 D1 NAS 节点配置...</div>
+              <div class="gate-desc">正在拉取您的家庭 NAS 下载驱动配置，请稍候。</div>
             </div>
           </div>
 
-          <!-- 目标落盘目录 -->
-          <div class="form-group">
-            <div class="flex-between">
-              <label class="group-label">目标存储目录 (NAS 影视盘)</label>
-              <button type="button" class="reset-link" @click="resetDefaultPath">恢复默认</button>
+          <!-- 门禁 2：已登录但尚未配置 NAS 节点 -->
+          <div v-else-if="!alistConfigured" class="gate-card unconfigured">
+            <div class="gate-icon">⚙️</div>
+            <div class="gate-content">
+              <div class="gate-title">尚未配置 NAS 节点与下载器</div>
+              <div class="gate-desc">请先在【我的 NAS】中配置 AList 访问凭证或 qBittorrent / Aria2 下载服务。</div>
+              <div class="gate-actions">
+                <button type="button" class="gate-btn primary" @click="openNasSettings">
+                  前往配置我的 NAS
+                </button>
+              </div>
             </div>
-            <input
-              v-model="form.targetDir"
-              type="text"
-              class="input-box"
-              placeholder="/Media/Movies" />
-            <p class="hint-text">
-              💡 适配绿联 DX4600：下载至对应目录后，绿联云影院将自动触发文件监控并自动生成海报墙。
-            </p>
           </div>
-        </template>
+
+          <!-- 状态 3：已就绪，展示完整下载器调度表单 -->
+          <template v-else>
+            <!-- 智能分类预设 -->
+            <div class="form-group">
+              <label class="group-label">影视媒体分类 (智能识别)</label>
+              <div class="category-chips">
+                <button
+                  type="button"
+                  :class="['chip', { active: form.category === 'movie' }]"
+                  @click="setCategory('movie')">
+                  🎬 电影 (Movies)
+                </button>
+                <button
+                  type="button"
+                  :class="['chip', { active: form.category === 'tv' }]"
+                  @click="setCategory('tv')">
+                  📺 电视剧 (TV)
+                </button>
+                <button
+                  type="button"
+                  :class="['chip', { active: form.category === 'anime' }]"
+                  @click="setCategory('anime')">
+                  🌸 动漫 (Anime)
+                </button>
+                <button
+                  type="button"
+                  :class="['chip', { active: form.category === 'other' }]"
+                  @click="setCategory('other')">
+                  📁 其他文件
+                </button>
+              </div>
+            </div>
+
+            <!-- 下载器选择 -->
+            <div class="form-group">
+              <label class="group-label">调度下载器驱动</label>
+              <div class="engine-selector">
+                <label class="engine-option">
+                  <input v-model="form.preferredClient" type="radio" value="aria2" />
+                  <span>Aria2 下载</span>
+                </label>
+                <label class="engine-option">
+                  <input v-model="form.preferredClient" type="radio" value="qbittorrent" />
+                  <span>qBittorrent (推荐 · AList 内网联动)</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 目标落盘目录 -->
+            <div class="form-group">
+              <div class="flex-between">
+                <label class="group-label">目标存储目录 (NAS 影视盘)</label>
+                <button type="button" class="reset-link" @click="resetDefaultPath">恢复默认</button>
+              </div>
+              <input
+                v-model="form.targetDir"
+                type="text"
+                class="input-box"
+                placeholder="/Media/Movies" />
+              <p class="hint-text">
+                💡 适配绿联 DX4600：下载至对应目录后，绿联云影院将自动触发文件监控并自动生成海报墙。
+              </p>
+            </div>
+          </template>
+        </div>
       </div>
 
       <!-- 底部操作栏 -->
@@ -274,10 +325,18 @@
         </template>
 
         <!-- 磁力类资源操作按钮 -->
-        <button v-else class="push-btn" :disabled="pushing" @click="executePush">
-          <span v-if="pushing" class="spinner"></span>
-          <span>{{ pushing ? '正在向 NAS 下发指令...' : '📥 立即推送到 NAS' }}</span>
-        </button>
+        <template v-else>
+          <a v-if="!isAuthenticated" href="/auth/login" class="push-btn primary-glow">
+            <span>🔒 请先登录账号</span>
+          </a>
+          <button v-else-if="!alistConfigured" class="push-btn primary-glow" @click="openNasSettings">
+            <span>⚙️ 前往配置我的 NAS</span>
+          </button>
+          <button v-else class="push-btn" :disabled="pushing || checkingProfile" @click="executePush">
+            <span v-if="pushing" class="spinner"></span>
+            <span>{{ pushing ? '正在向 NAS 下发指令...' : '📥 立即推送到 NAS' }}</span>
+          </button>
+        </template>
       </div>
     </div>
   </div>
@@ -308,6 +367,7 @@ const mountSuccessResult = ref<any>(null);
 const userOpenedSharePage = ref(false);
 
 const alistConfigured = ref(false);
+const checkingProfile = ref(false);
 const userDefaultPath = ref("/NAS本地盘");
 const userStorages = ref<any[]>([]);
 
@@ -389,6 +449,11 @@ async function checkUserProfile() {
         : "/NAS本地盘";
   }
 
+  // 若本地尚未命中配置，标记检查中以展示平滑占位动画，杜绝误报
+  if (!alistConfigured.value) {
+    checkingProfile.value = true;
+  }
+
   // 2. 异步同步服务端（并在边缘节点冷重启时自动回写自愈）
   try {
     const prof = await fetchNasProfile();
@@ -421,6 +486,8 @@ async function checkUserProfile() {
       alistConfigured.value = false;
       userStorages.value = [];
     }
+  } finally {
+    checkingProfile.value = false;
   }
 }
 
@@ -1158,9 +1225,29 @@ async function executePush() {
   border-color: rgba(245, 158, 11, 0.25);
 }
 
+.gate-card.loading-gate {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.25);
+  align-items: center;
+}
+
+.spinner-large {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid rgba(59, 130, 246, 0.3);
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
 .gate-icon {
   font-size: 24px;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .gate-content {

@@ -140,6 +140,7 @@
 const route = useRoute();
 const router = useRouter();
 const { fetchUser, setStoredToken } = useAuth();
+const { loadProfile } = useNasProfile();
 
 const mode = ref<"login" | "register">("login");
 const isBootstrap = ref(false);
@@ -194,6 +195,7 @@ async function handleLogin() {
     }
     successMessage.value = "登录成功，正在前往主页...";
     await fetchUser();
+    await loadProfile(true).catch(() => {});
     const redirect = (route.query.redirect as string) || "/";
     setTimeout(() => {
       window.location.href = redirect;
@@ -224,6 +226,7 @@ async function handleRegister() {
     }
     successMessage.value = "账号创建成功，正在前往主页...";
     await fetchUser();
+    await loadProfile(true).catch(() => {});
     const redirect = (route.query.redirect as string) || "/";
     setTimeout(() => {
       window.location.href = redirect;

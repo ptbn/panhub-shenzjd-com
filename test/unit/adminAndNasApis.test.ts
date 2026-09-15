@@ -169,4 +169,67 @@ describe("Admin & NAS Profile 业务层综合测试", () => {
     const allUsers = await db.listUsers();
     expect(allUsers.some((u) => u.email === "direct@taogehome.cloud")).toBe(true);
   });
+
+  it("家庭/系统默认 NAS 配置自动降级兜底与专属配置覆盖机制", async () => {
+    // 1. 管理员创建并配置系统默认 NAS (isDefault = 1)
+    const admin = await registerUser(
+      { email: "owner@taogehome.cloud", username: "HouseOwner", password: "Password123" },
+      db
+    );
+    const encToken = await encryptCredential("alist-family-shared-token", masterSecret);
+    await db.upsertNasProfile({
+      id: "nas_default_1",
+      userId: admin.user.id,
+      name: "绿联 DX4600 家庭共享",
+      isDefault: 1,
+      cloudDriveEnabled: 1,
+      alistUrl: "https://alist.taogehome.cloud",
+      alistTokenEncrypted: encToken,
+      alistDefaultPath: "/NAS本地盘",
+      torrentClientType: "qbittorrent",
+      torrentClientUrl: "http://192.168.31.2:8080",
+      torrentClientSecretEncrypted: "",
+      torrentDefaultDir: "/volume2/影音资源",
+    });
+
+    // 2. 新成员注册，尚未主动配置 NAS
+    const inv = await createInviteCode(admin.user.id, db);
+    const member = await registerUser(
+      { email: "family@taogehome.cloud", username: "FamilyMember", password: "Password123", inviteCode: inv.code },
+      db
+    );
+
+    // 3. 验证新成员通过 getNasProfile 能够无缝继承系统默认配置，绝不报“未配置”
+    const fallbackProfile = await db.getNasProfile(member.user.id);
+    expect(fallbackProfile).not.toBeNull();
+    expect(fallbackProfile?.name).toBe("绿联 DX4600 家庭共享");
+    expect(fallbackProfile?.alistUrl).toBe("https://alist.taogehome.cloud");
+    expect(fallbackProfile?.torrentDefaultDir).toBe("/volume2/影音资源");
+
+    // 4. 新成员在设置中自定义了自己的专属 NAS 目录
+    const memberToken = await encryptCredential("member-private-token", masterSecret);
+    await db.upsertNasProfile({
+      id: "nas_member_1",
+      userId: member.user.id,
+      name: "小明的极空间 NAS",
+      isDefault: 0,
+      cloudDriveEnabled: 1,
+      alistUrl: "https://alist-member.taogehome.cloud",
+      alistTokenEncrypted: memberToken,
+      alistDefaultPath: "/小明专属盘",
+      torrentClientType: "aria2",
+      torrentClientUrl: "http://192.168.31.5:6800/jsonrpc",
+      torrentClientSecretEncrypted: "",
+      torrentDefaultDir: "/downloads/member",
+    });
+
+    // 5. 验证新成员读取到自己的专属配置，而管理员仍然读取自己的默认配置
+    const memberProfile = await db.getNasProfile(member.user.id);
+    expect(memberProfile?.name).toBe("小明的极空间 NAS");
+    expect(memberProfile?.alistUrl).toBe("https://alist-member.taogehome.cloud");
+
+    const adminProfile = await db.getNasProfile(admin.user.id);
+    expect(adminProfile?.name).toBe("绿联 DX4600 家庭共享");
+    expect(adminProfile?.alistUrl).toBe("https://alist.taogehome.cloud");
+  });
 });

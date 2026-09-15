@@ -2,7 +2,7 @@
 // NAS 与 AList 用户配置持久化管理
 // 具备双存储：LocalStorage 本地优先缓存 + 边缘 D1 远端同步
 
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useAuth } from "./useAuth";
 
 export interface NasProfilePublic {
@@ -36,9 +36,10 @@ const LOCAL_STORAGE_KEY = "panhub_nas_profile";
 const LOCAL_CREDENTIALS_KEY = "panhub_nas_credentials";
 
 export function useNasProfile() {
-  const { isAuthenticated, getStoredToken } = useAuth();
+  const { isAuthenticated, getStoredToken, user } = useAuth();
   const profile = useState<NasProfilePublic | null>("nas_profile_data", () => null);
   const loading = ref(false);
+  const profileLoaded = useState<boolean>("nas_profile_loaded", () => false);
 
   function getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {};
@@ -82,11 +83,28 @@ export function useNasProfile() {
     }
   }
 
+  // 客户端响应式联动：当用户登录、登出或通过 Session 恢复会话时，主动静默从 D1 拉取最新配置
+  if (import.meta.client) {
+    watch(
+      () => user.value?.id,
+      (newUserId) => {
+        if (newUserId) {
+          loadProfile(true).catch(() => {});
+        } else if (!isAuthenticated.value) {
+          // 用户未登录且无会话，清理内存状态
+          profile.value = null;
+        }
+      },
+      { immediate: true }
+    );
+  }
+
   // 初始化优先从本地 LocalStorage 加载，确保 0 秒即刻生效
   if (import.meta.client && !profile.value) {
     const local = getLocalProfile();
     if (local && local.alistUrl) {
       profile.value = local;
+      profileLoaded.value = true;
     }
   }
 
@@ -96,6 +114,7 @@ export function useNasProfile() {
    */
   async function loadProfile(force = false): Promise<NasProfilePublic | null> {
     if (!force && profile.value?.alistUrl) {
+      profileLoaded.value = true;
       return profile.value;
     }
 
@@ -114,6 +133,7 @@ export function useNasProfile() {
       if (res.profile && res.profile.alistUrl) {
         profile.value = res.profile;
         setLocalProfile(res.profile);
+        profileLoaded.value = true;
         return res.profile;
       }
 
@@ -129,6 +149,7 @@ export function useNasProfile() {
           if (syncRes.profile) {
             profile.value = syncRes.profile;
             setLocalProfile(syncRes.profile);
+            profileLoaded.value = true;
             return syncRes.profile;
           }
         } catch (syncErr) {
@@ -136,12 +157,14 @@ export function useNasProfile() {
         }
       }
 
+      profileLoaded.value = true;
       return profile.value;
     } catch (e) {
       // 异常时保持本地缓存
       return profile.value;
     } finally {
       loading.value = false;
+      profileLoaded.value = true;
     }
   }
 
@@ -187,6 +210,7 @@ export function useNasProfile() {
   return {
     profile,
     loading,
+    profileLoaded,
     isAlistConfigured,
     alistDefaultPath,
     loadProfile,

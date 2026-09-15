@@ -283,10 +283,18 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
   // NAS Profiles
   async getNasProfile(userId: string): Promise<NasProfileRecord | null> {
-    const row = await this.db
+    let row = await this.db
       .prepare("SELECT * FROM nas_profiles WHERE user_id = ?")
       .bind(userId)
       .first<any>();
+
+    // 降级兜底：私有化与家庭场景下，若该账号尚未单独配置，无缝回退至系统全局默认配置 (is_default = 1)
+    if (!row) {
+      row = await this.db
+        .prepare("SELECT * FROM nas_profiles WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1")
+        .first<any>();
+    }
+
     if (!row) return null;
     return this.mapNasProfile(row);
   }
@@ -294,9 +302,13 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
   async upsertNasProfile(
     profile: Omit<NasProfileRecord, "createdAt" | "updatedAt">
   ): Promise<NasProfileRecord> {
-    const existing = await this.getNasProfile(profile.userId);
+    const existingRow = await this.db
+      .prepare("SELECT * FROM nas_profiles WHERE user_id = ?")
+      .bind(profile.userId)
+      .first<any>();
     const now = Date.now();
-    const createdAt = existing ? existing.createdAt : now;
+    const createdAt = existingRow ? existingRow.created_at : now;
+    const finalId = existingRow ? existingRow.id : (profile.id || `nas_${now}_${Math.random().toString(36).slice(2, 7)}`);
 
     await this.db
       .prepare(
@@ -320,7 +332,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
           updated_at = excluded.updated_at`
       )
       .bind(
-        profile.id,
+        finalId,
         profile.userId,
         profile.name,
         profile.isDefault,
@@ -339,6 +351,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
     return {
       ...profile,
+      id: finalId,
       createdAt,
       updatedAt: now,
     };
