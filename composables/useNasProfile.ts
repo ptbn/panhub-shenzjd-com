@@ -1,13 +1,22 @@
 // composables/useNasProfile.ts
-// NAS Óë AList ÓÃ»§ÅäÖÃ³Ö¾Ã»¯¹ÜÀí
-// ¾ß±¸Ë«¹ì´æ´¢£¨LocalStorage ±¾µØÕæÖµ + ±ßÔµ¶Ë×Ô¶¯×ÔÓúÓëÍ¬²½£©
+// NAS ä¸ AList ç”¨æˆ·é…ç½®æŒä¹…åŒ–ç®¡ç†
+// å…·å¤‡åŒå­˜å‚¨ï¼šLocalStorage æœ¬åœ°ä¼˜å…ˆç¼“å­˜ + è¾¹ç¼˜ D1 è¿œç«¯åŒæ­¥
 
 import { ref, computed } from "vue";
 import { useAuth } from "./useAuth";
-import type { NasProfilePublic } from "../server/core/nas/types";
 
-const LOCAL_STORAGE_KEY = "panhub_nas_profile";
-const LOCAL_CREDENTIALS_KEY = "panhub_nas_credentials";
+export interface NasProfilePublic {
+  name: string;
+  cloudDriveEnabled: boolean;
+  alistUrl: string;
+  alistHasToken: boolean;
+  alistDefaultPath: string;
+  torrentClientType: "aria2" | "qbittorrent";
+  torrentClientUrl: string;
+  torrentHasSecret: boolean;
+  torrentDefaultDir: string;
+  updatedAt?: number;
+}
 
 export interface NasFormData {
   name: string;
@@ -22,6 +31,9 @@ export interface NasFormData {
   torrentHasSecret: boolean;
   torrentDefaultDir: string;
 }
+
+const LOCAL_STORAGE_KEY = "panhub_nas_profile";
+const LOCAL_CREDENTIALS_KEY = "panhub_nas_credentials";
 
 export function useNasProfile() {
   const { isAuthenticated, getStoredToken } = useAuth();
@@ -70,7 +82,7 @@ export function useNasProfile() {
     }
   }
 
-  // ³õÊ¼»¯³¢ÊÔÏÈ´Ó±¾µØ LocalStorage ¼ÓÔØ£¬È·±£ 0 ºÁÃë¼´¿ÌÉúĞ§
+  // åˆå§‹åŒ–ä¼˜å…ˆä»æœ¬åœ° LocalStorage åŠ è½½ï¼Œç¡®ä¿ 0 ç§’å³åˆ»ç”Ÿæ•ˆ
   if (import.meta.client && !profile.value) {
     const local = getLocalProfile();
     if (local && local.alistUrl) {
@@ -79,15 +91,15 @@ export function useNasProfile() {
   }
 
   /**
-   * ´Ó·şÎñ¶Ë¼ÓÔØ NAS Profile
-   * Èô·şÎñ¶ËÒòÖØĞÂ²¿Êğ/±ßÔµÀäÖØÆôµ¼ÖÂÊı¾İÎª¿Õ£¬×Ô¶¯´Ó±¾µØ LocalStorage ´¥·¢»ØĞ´×ÔÓú£¡
+   * ä»æœåŠ¡ç«¯åŠ è½½ NAS Profile
+   * è‹¥åº•å±‚/è¾¹ç¼˜ä¸ºç©ºï¼Œè‡ªåŠ¨ä»æœ¬åœ° LocalStorage ä¸­å›å†™
    */
   async function loadProfile(force = false): Promise<NasProfilePublic | null> {
     if (!force && profile.value?.alistUrl) {
       return profile.value;
     }
 
-    // ÏÈÓÃ±¾µØ»º´æÍĞµ×
+    // å…ˆç”¨æœ¬åœ°ç¼“å­˜å«åº•
     const localCached = getLocalProfile();
     if (localCached && localCached.alistUrl && !profile.value) {
       profile.value = localCached;
@@ -105,7 +117,7 @@ export function useNasProfile() {
         return res.profile;
       }
 
-      // ·şÎñ¶Ë·µ»Ø¿Õ£¬µ«±¾µØÓĞÒÑ±£´æµÄÆ¾¾İ -> ±ßÔµ¶Ë Worker ÖØÆô×ÔÓú»úÖÆ£¡
+      // è‹¥æœåŠ¡ç«¯è¿”å›ç©ºï¼Œå°è¯•æ‹¿æœ¬åœ°å‡­æ® -> å‘è¾¹ç¼˜ Worker è‡ªåŠ¨åŒæ­¥æ¢å¤
       const localCreds = getLocalCredentials();
       if (localCreds && localCreds.alistUrl && isAuthenticated.value) {
         try {
@@ -120,13 +132,13 @@ export function useNasProfile() {
             return syncRes.profile;
           }
         } catch (syncErr) {
-          console.warn("[NAS Profile] ×ÔÓúÍ¬²½ÌáÊ¾:", syncErr);
+          console.warn("[NAS Profile] è‡ªåŠ¨åŒæ­¥æç¤º:", syncErr);
         }
       }
 
       return profile.value;
     } catch (e) {
-      // ÍøÂç»òÀëÏßÒì³££¬¼ÌĞø±£³Ö±¾µØ»º´æ
+      // å¼‚å¸¸æ—¶ä¿æŒæœ¬åœ°ç¼“å­˜
       return profile.value;
     } finally {
       loading.value = false;
@@ -134,15 +146,15 @@ export function useNasProfile() {
   }
 
   /**
-   * ±£´æ NAS Profile£¬Ë«Ğ´±¾µØÓë·şÎñ¶Ë
+   * ä¿å­˜ NAS Profileï¼ŒåŒå†™ä¿è¯
    */
   async function saveProfile(formData: NasFormData): Promise<NasProfilePublic> {
     loading.value = true;
     try {
-      // 1. ±¾µØ´æ´¢Á¢¼´¸üĞÂ
+      // 1. æœ¬åœ°å­˜å‚¨ä¿åº•
       setLocalProfile(formData, formData);
 
-      // 2. ·¢ËÍ·şÎñ¶Ë
+      // 2. åŒæ­¥æœåŠ¡ç«¯
       const res = await $fetch<{ success: boolean; profile: NasProfilePublic }>("/api/nas/profile", {
         method: "POST",
         headers: getAuthHeaders(),
@@ -154,7 +166,7 @@ export function useNasProfile() {
         setLocalProfile(res.profile, formData);
         return res.profile;
       }
-      throw new Error("·şÎñ¶ËÎ´·µ»ØÓĞĞ§ÅäÖÃ");
+      throw new Error("æœåŠ¡ç«¯æœªè¿”å›æœ‰æ•ˆé…ç½®");
     } finally {
       loading.value = false;
     }
@@ -166,8 +178,8 @@ export function useNasProfile() {
 
   const alistDefaultPath = computed(() => {
     const raw = profile.value?.alistDefaultPath;
-    if (!raw || raw === "/ÎÒµÄÍøÅÌ/µçÓ°" || raw === "/ÎÒµÄÓ°ÊÓ¹ÒÔØ" || raw.startsWith("/ÎÒµÄÍøÅÌ")) {
-      return "/NAS±¾µØÅÌ";
+    if (!raw || raw.startsWith("/æˆ‘çš„å½±è§†æŒ‚è½½") || raw.startsWith("/æˆ‘çš„NAS")) {
+      return raw || "/NASæœ¬åœ°ç›˜";
     }
     return raw;
   });
