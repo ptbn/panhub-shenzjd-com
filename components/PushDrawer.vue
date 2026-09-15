@@ -287,6 +287,7 @@
 import { ref, reactive, computed, watch } from "vue";
 import { parseResourceMeta } from "~/composables/useResourceParser";
 import { useAuth } from "~/composables/useAuth";
+import { useNasProfile } from "~/composables/useNasProfile";
 import { resolveNetdiskMountPath } from "~/utils/storageResolver";
 
 const props = defineProps<{
@@ -296,6 +297,7 @@ const props = defineProps<{
 const emit = defineEmits(["close", "success"]);
 
 const { user, isAuthenticated } = useAuth();
+const { loadProfile: fetchNasProfile, getLocalProfile, getAuthHeaders } = useNasProfile();
 const nasModalVisible = useState<boolean>("nas_modal_visible", () => false);
 
 const pushing = ref(false);
@@ -303,10 +305,23 @@ const mounting = ref(false);
 const refreshing = ref(false);
 const feedback = ref<{ success: boolean; message: string } | null>(null);
 const mountSuccessResult = ref<any>(null);
+const userOpenedSharePage = ref(false);
 
 const alistConfigured = ref(false);
-const userDefaultPath = ref("");
+const userDefaultPath = ref("/NAS本地盘");
 const userStorages = ref<any[]>([]);
+
+// 立即在客户端从 LocalStorage 硬持久化恢复状态，防任何时机闪烁
+if (import.meta.client) {
+  const local = getLocalProfile();
+  if (local && local.alistUrl) {
+    alistConfigured.value = true;
+    userDefaultPath.value =
+      local.alistDefaultPath && !local.alistDefaultPath.startsWith("/我的网盘") && local.alistDefaultPath !== "/我的影视挂载"
+        ? local.alistDefaultPath
+        : "/NAS本地盘";
+  }
+}
 
 const form = reactive({
   category: "movie" as "movie" | "tv" | "anime" | "other",
@@ -364,22 +379,30 @@ const inferredMediaType = computed(() => {
 });
 
 async function checkUserProfile() {
-  if (!isAuthenticated.value) {
-    alistConfigured.value = false;
-    userStorages.value = [];
-    return;
+  // 1. 本地 LocalStorage 瞬时检查
+  const local = getLocalProfile();
+  if (local && local.alistUrl) {
+    alistConfigured.value = true;
+    userDefaultPath.value =
+      local.alistDefaultPath && !local.alistDefaultPath.startsWith("/我的网盘") && local.alistDefaultPath !== "/我的影视挂载"
+        ? local.alistDefaultPath
+        : "/NAS本地盘";
   }
+
+  // 2. 异步同步服务端（并在边缘节点冷重启时自动回写自愈）
   try {
-    const res = await $fetch<{ profile: any }>("/api/nas/profile");
-    if (res.profile && res.profile.alistUrl) {
+    const prof = await fetchNasProfile();
+    if (prof && prof.alistUrl) {
       alistConfigured.value = true;
       userDefaultPath.value =
-        res.profile.alistDefaultPath && res.profile.alistDefaultPath !== "/我的影视挂载" && res.profile.alistDefaultPath !== "/我的网盘/电影"
-          ? res.profile.alistDefaultPath
+        prof.alistDefaultPath && !prof.alistDefaultPath.startsWith("/我的网盘") && prof.alistDefaultPath !== "/我的影视挂载"
+          ? prof.alistDefaultPath
           : "/NAS本地盘";
 
       // 异步抓取当前 AList 已挂载存储列表，用于精准解析目录
-      $fetch<{ success: boolean; storages: any[] }>("/api/nas/storages")
+      $fetch<{ success: boolean; storages: any[] }>("/api/nas/storages", {
+        headers: getAuthHeaders(),
+      })
         .then((sRes) => {
           if (sRes.success && sRes.storages) {
             userStorages.value = sRes.storages;
@@ -389,13 +412,15 @@ async function checkUserProfile() {
           }
         })
         .catch(() => {});
-    } else {
+    } else if (!local?.alistUrl) {
       alistConfigured.value = false;
       userStorages.value = [];
     }
   } catch {
-    alistConfigured.value = false;
-    userStorages.value = [];
+    if (!local?.alistUrl) {
+      alistConfigured.value = false;
+      userStorages.value = [];
+    }
   }
 }
 
@@ -448,6 +473,7 @@ watch(
     if (v) {
       feedback.value = null;
       mountSuccessResult.value = null;
+      userOpenedSharePage.value = false;
       checkUserProfile();
     }
   },
@@ -531,6 +557,7 @@ async function executeMountShare() {
   try {
     const res = await $fetch<any>("/api/nas/mount-share", {
       method: "POST",
+      headers: getAuthHeaders(),
       body: {
         url: props.item.url,
         password: props.item.password,
@@ -560,6 +587,7 @@ async function executeMountShare() {
  * 备用：复制提取码并在新标签页打开网盘分享页
  */
 async function copyAndOpenShare() {
+  userOpenedSharePage.value = true;
   if (!props.item?.url) return;
   if (props.item.password && typeof navigator !== "undefined" && navigator.clipboard) {
     try {
@@ -594,6 +622,16 @@ async function triggerManualRefresh() {
     return;
   }
 
+  // 严格防呆拦截：若用户尚未点击打开网盘，给出醒目警示，消除“以为点击此按钮能替我存入网盘”的认知错位
+  if (!userOpenedSharePage.value) {
+    feedback.value = {
+      success: false,
+      message: "⚠️ 特别提醒：该按钮仅用于通知 AList 刷新影视海报墙，系统无法代替您向网盘转存文件！请务必先点击【① 打开网盘转存 (带提取码)】并在网盘官方网页中点击【保存到网盘】；若您此前已经在网盘中保存过了，请再次点击本按钮即可穿透刷新。",
+    };
+    userOpenedSharePage.value = true; // 允许第二次点击继续穿透刷新
+    return;
+  }
+
   refreshing.value = true;
   feedback.value = null;
 
@@ -602,6 +640,7 @@ async function triggerManualRefresh() {
   try {
     const res = await $fetch<any>("/api/nas/refresh", {
       method: "POST",
+      headers: getAuthHeaders(),
       body: {
         path: targetPath,
         url: props.item?.url || "",
@@ -635,6 +674,7 @@ async function executePush() {
       "/api/nas/push",
       {
         method: "POST",
+        headers: getAuthHeaders(),
         body: {
           title: props.item.note || props.item.url,
           url: props.item.url,

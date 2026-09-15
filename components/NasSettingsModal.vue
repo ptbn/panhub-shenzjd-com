@@ -237,10 +237,14 @@
 </template>
 
 <script setup lang="ts">
+import { useNasProfile } from "~/composables/useNasProfile";
+
 const props = defineProps<{
   visible: boolean;
 }>();
 const emit = defineEmits(["close", "saved"]);
+
+const { loadProfile, saveProfile: persistNasProfile, getLocalProfile, getLocalCredentials, getAuthHeaders } = useNasProfile();
 
 const form = reactive({
   name: "我的绿联 DX4600 UGOS",
@@ -256,6 +260,32 @@ const form = reactive({
   torrentDefaultDir: "/Media/Movies",
 });
 
+function hydrateFromLocal() {
+  const local = getLocalCredentials() || getLocalProfile();
+  if (local) {
+    if (local.name) form.name = local.name;
+    if (local.alistUrl) form.alistUrl = local.alistUrl;
+    if (local.alistToken && local.alistToken !== "******") {
+      form.alistToken = local.alistToken;
+      form.alistHasToken = true;
+    }
+    if (local.alistDefaultPath && !local.alistDefaultPath.startsWith("/我的网盘") && local.alistDefaultPath !== "/我的影视挂载") {
+      form.alistDefaultPath = local.alistDefaultPath;
+    }
+    if (local.torrentClientType) form.torrentClientType = local.torrentClientType;
+    if (local.torrentClientUrl) form.torrentClientUrl = local.torrentClientUrl;
+    if (local.torrentClientSecret && local.torrentClientSecret !== "******") {
+      form.torrentClientSecret = local.torrentClientSecret;
+      form.torrentHasSecret = true;
+    }
+    if (local.torrentDefaultDir) form.torrentDefaultDir = local.torrentDefaultDir;
+  }
+}
+
+if (import.meta.client) {
+  hydrateFromLocal();
+}
+
 const saving = ref(false);
 const testingAlist = ref(false);
 const testingTorrent = ref(false);
@@ -264,7 +294,9 @@ const mountedStorages = ref<Array<{ id: number; mountPath: string; driver: strin
 
 async function loadStorages() {
   try {
-    const res = await $fetch<{ success: boolean; storages: any[] }>("/api/nas/storages");
+    const res = await $fetch<{ success: boolean; storages: any[] }>("/api/nas/storages", {
+      headers: getAuthHeaders(),
+    });
     if (res.success && res.storages) {
       mountedStorages.value = res.storages;
       // 自动自愈：若当前配置的是历史遗留的假目录，纠偏为实机存在的真实存储
@@ -297,15 +329,16 @@ watch(
   async (v) => {
     if (v) {
       testFeedback.value = null;
+      hydrateFromLocal();
       loadStorages();
       try {
-        const res = await $fetch<{ profile: any }>("/api/nas/profile");
-        if (res.profile) {
-          form.name = res.profile.name;
-          form.cloudDriveEnabled = res.profile.cloudDriveEnabled;
-          form.alistUrl = res.profile.alistUrl;
-          form.alistHasToken = res.profile.alistHasToken;
-          const rawPath = res.profile.alistDefaultPath || "";
+        const profile = await loadProfile();
+        if (profile) {
+          form.name = profile.name;
+          form.cloudDriveEnabled = profile.cloudDriveEnabled;
+          form.alistUrl = profile.alistUrl;
+          form.alistHasToken = profile.alistHasToken;
+          const rawPath = profile.alistDefaultPath || "";
           if (
             !rawPath ||
             rawPath === "/我的网盘/电影" ||
@@ -316,11 +349,11 @@ watch(
           } else {
             form.alistDefaultPath = rawPath;
           }
-          form.torrentClientType = res.profile.torrentClientType || "aria2";
-          form.torrentClientUrl = res.profile.torrentClientUrl;
-          form.torrentHasSecret = res.profile.torrentHasSecret;
-          form.torrentClientSecret = res.profile.torrentHasSecret ? "******" : "";
-          form.torrentDefaultDir = res.profile.torrentDefaultDir;
+          form.torrentClientType = profile.torrentClientType || "aria2";
+          form.torrentClientUrl = profile.torrentClientUrl;
+          form.torrentHasSecret = profile.torrentHasSecret;
+          form.torrentClientSecret = profile.torrentHasSecret ? "******" : "";
+          form.torrentDefaultDir = profile.torrentDefaultDir;
         }
       } catch (e) {
         console.error("加载 NAS 配置失败:", e);
@@ -396,10 +429,7 @@ async function saveProfile() {
   saving.value = true;
   testFeedback.value = null;
   try {
-    await $fetch("/api/nas/profile", {
-      method: "POST",
-      body: form,
-    });
+    await persistNasProfile(form);
     emit("saved");
     emit("close");
   } catch (err: any) {

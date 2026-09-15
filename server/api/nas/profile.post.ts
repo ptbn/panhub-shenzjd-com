@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
     cloudDriveEnabled: body.cloudDriveEnabled !== false ? 1 : 0,
     alistUrl: body.alistUrl || "",
     alistTokenEncrypted,
-    alistDefaultPath: body.alistDefaultPath || "/我的网盘/电影",
+    alistDefaultPath: body.alistDefaultPath || "/NAS本地盘",
     torrentClientType: body.torrentClientType === "qbittorrent" ? "qbittorrent" : "aria2",
     torrentClientUrl: body.torrentClientUrl || "",
     torrentClientSecretEncrypted,

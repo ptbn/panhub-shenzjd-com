@@ -78,5 +78,6 @@ export function useAuth() {
     fetchUser,
     logout,
     setStoredToken,
+    getStoredToken,
   };
 }
