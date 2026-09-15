@@ -61,13 +61,35 @@
                 :placeholder="form.alistHasToken ? '****** (留空保持原配置)' : '输入 AList API Token'" />
             </div>
             <div class="form-item">
-              <label>用户专属挂载根目录 (多用户隔离)</label>
+              <div class="flex-between">
+                <label>用户专属挂载根目录 (多用户隔离)</label>
+                <span class="field-subhint font-mono">必须为 AList 真实存储挂载点</span>
+              </div>
               <input
                 v-model="form.alistDefaultPath"
                 type="text"
                 class="input-field"
-                placeholder="/我的影视挂载" />
-              <p class="field-hint">影视动态挂载点将创建在此目录下，各账号天然隔离。</p>
+                placeholder="例如 /NAS本地盘 或 /夸克 (留空使用根目录 /)" />
+              <div v-if="mountedStorages.length > 0" class="quick-mount-chips">
+                <span class="quick-chip-label">快捷选用已挂载存储：</span>
+                <button
+                  v-for="s in mountedStorages"
+                  :key="s.id"
+                  type="button"
+                  class="mount-chip-btn"
+                  :class="{ active: form.alistDefaultPath === s.mountPath }"
+                  @click="form.alistDefaultPath = s.mountPath">
+                  {{ s.mountPath }}
+                </button>
+                <button
+                  type="button"
+                  class="mount-chip-btn"
+                  :class="{ active: form.alistDefaultPath === '/' }"
+                  @click="form.alistDefaultPath = '/'">
+                  / (全局根目录)
+                </button>
+              </div>
+              <p class="field-hint">影视动态挂载或推送将以此目录为基准，系统已自动对齐您的 AList 实机存储。</p>
             </div>
             <div class="col-span-2">
               <button
@@ -226,7 +248,7 @@ const form = reactive({
   alistUrl: "",
   alistToken: "",
   alistHasToken: false,
-  alistDefaultPath: "/我的网盘/电影",
+  alistDefaultPath: "/NAS本地盘",
   torrentClientType: "aria2" as "aria2" | "qbittorrent",
   torrentClientUrl: "",
   torrentClientSecret: "",
@@ -245,6 +267,13 @@ async function loadStorages() {
     const res = await $fetch<{ success: boolean; storages: any[] }>("/api/nas/storages");
     if (res.success && res.storages) {
       mountedStorages.value = res.storages;
+      // 自动自愈：若当前配置的是历史遗留的假目录，纠偏为实机存在的真实存储
+      if (form.alistDefaultPath === "/我的网盘/电影" || form.alistDefaultPath === "/我的影视挂载") {
+        const local = res.storages.find((s: any) => s.mountPath.includes("本地") || s.mountPath.includes("NAS")) || res.storages[0];
+        if (local) {
+          form.alistDefaultPath = local.mountPath;
+        }
+      }
     }
   } catch (e) {
     // 静默降级，不阻塞界面渲染
@@ -276,8 +305,17 @@ watch(
           form.cloudDriveEnabled = res.profile.cloudDriveEnabled;
           form.alistUrl = res.profile.alistUrl;
           form.alistHasToken = res.profile.alistHasToken;
-          form.alistToken = res.profile.alistHasToken ? "******" : "";
-          form.alistDefaultPath = res.profile.alistDefaultPath;
+          const rawPath = res.profile.alistDefaultPath || "";
+          if (
+            !rawPath ||
+            rawPath === "/我的网盘/电影" ||
+            rawPath === "/我的影视挂载" ||
+            rawPath.startsWith("/我的网盘")
+          ) {
+            form.alistDefaultPath = "/NAS本地盘";
+          } else {
+            form.alistDefaultPath = rawPath;
+          }
           form.torrentClientType = res.profile.torrentClientType || "aria2";
           form.torrentClientUrl = res.profile.torrentClientUrl;
           form.torrentHasSecret = res.profile.torrentHasSecret;
@@ -295,8 +333,8 @@ watch(
 function quickFillTaogeAlist() {
   form.alistUrl = "https://alist.taogehome.cloud";
   form.alistToken = "alist-871d2cbe-8d73-4996-8b6e-243d4c68868eSEanz0h5BaIf9RqZ3HqxIXoe5pW6eJzP38pWZGSxp8plF9xZNyCHPZPzG8jlECTP";
-  if (!form.alistDefaultPath) {
-    form.alistDefaultPath = "/我的影视挂载";
+  if (!form.alistDefaultPath || form.alistDefaultPath === "/我的影视挂载" || form.alistDefaultPath === "/我的网盘/电影") {
+    form.alistDefaultPath = "/NAS本地盘";
   }
   testFeedback.value = {
     success: true,
@@ -842,5 +880,48 @@ function copyText(text: string) {
   color: #9ca3af;
   margin: 4px 0 0;
   line-height: 1.4;
+}
+
+.field-subhint {
+  font-size: 11px;
+  color: #10b981;
+}
+
+.quick-mount-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.quick-chip-label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.mount-chip-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mount-chip-btn:hover {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.mount-chip-btn.active {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  color: #10b981;
+  font-weight: 600;
 }
 </style>

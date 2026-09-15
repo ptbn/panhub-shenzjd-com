@@ -122,6 +122,24 @@ describe("NAS Drivers & SSRF Security 模块测试", () => {
       expect(res.total).toBe(12);
       expect(res.message).toContain("缓存已成功穿透刷新");
     });
+
+    it("当 AList 目录不存在返回 storage not found 时，输出人性化指引避免 rawPath 裸露", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            code: 500,
+            message: "failed get storage: storage not found; rawPath: /迅雷网盘",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await refreshAListPath("https://alist.taogehome.cloud", "my-token", "/迅雷网盘");
+      expect(res.success).toBe(false);
+      expect(res.message).not.toContain("rawPath");
+      expect(res.message).toContain("未在 AList 中检测到挂载目录");
+      expect(res.message).toContain("/迅雷网盘");
+    });
   });
 
   describe("Aria2 JSON-RPC 客户端", () => {

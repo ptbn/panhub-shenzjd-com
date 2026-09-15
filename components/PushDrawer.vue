@@ -104,8 +104,8 @@
               </div>
             </div>
 
-            <!-- 挂载前引导卡片 -->
-            <div v-else class="z9x-card">
+            <!-- 挂载前引导卡片：方案 A (支持动态只读分享挂载，如 115/百度/阿里/123Pan) -->
+            <div v-else-if="canShareMount" class="z9x-card">
               <div class="z9x-header">
                 <span class="z9x-badge">⚡ 方案 A：AList 动态分享挂载</span>
                 <span class="z9x-tag">免转存 · 芝杜秒播</span>
@@ -125,7 +125,34 @@
                 </div>
                 <div class="step-item">
                   <span class="step-num">3</span>
-                  <div class="step-text">若遇到特殊链接失效，支持随时使用下方备用通道前往网盘官方转存。</div>
+                  <div class="step-text">若遇到特殊链接失效，支持随时使用备用通道前往网盘官方转存。</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 挂载前引导卡片：方案 B (需转存个人盘，如迅雷/夸克/UC/天翼等) -->
+            <div v-else class="z9x-card transfer-card">
+              <div class="z9x-header">
+                <span class="z9x-badge transfer-badge">📦 方案 B：转存至个人盘 · 穿透同步</span>
+                <span class="z9x-tag transfer-tag">需转存个人盘 · 芝杜秒播</span>
+              </div>
+              <div class="mount-path-preview">
+                <span class="preview-label">识别目标网盘：</span>
+                <code class="preview-path">{{ detectedNetdiskName }}</code>
+                <span v-if="resolvedAlistPath" class="target-storage-tag">AList 挂载点: {{ resolvedAlistPath }}</span>
+              </div>
+              <div class="z9x-steps">
+                <div class="step-item">
+                  <span class="step-num">1</span>
+                  <div class="step-text">该网盘暂不支持直接免转存挂载。请先点击下方<b>「① 打开网盘转存 (带提取码)」</b>，存入您网盘的影视目录；</div>
+                </div>
+                <div class="step-item">
+                  <span class="step-num">2</span>
+                  <div class="step-text">转存成功后，点击下方<b>「② 存入后穿透刷新 AList」</b>，系统自动穿透刷新对应目录缓存；</div>
+                </div>
+                <div class="step-item">
+                  <span class="step-num">3</span>
+                  <div class="step-text"><b>芝杜 Z9X 海报墙将即刻自动识别并原画直映</b>，畅享 4K 极速秒播。</div>
                 </div>
               </div>
             </div>
@@ -204,27 +231,43 @@
 
         <!-- 网盘类资源操作按钮群 -->
         <template v-if="isCloud">
-          <button
-            v-if="canShareMount && isAuthenticated && alistConfigured"
-            class="push-btn primary-glow"
-            :disabled="mounting"
-            @click="executeMountShare">
-            <span v-if="mounting" class="spinner"></span>
-            <span>{{ mounting ? '正在挂载并同步...' : '⚡ 一键挂载到 AList (芝杜秒播)' }}</span>
-          </button>
+          <!-- 方案 A 操作群 (免转存直接挂载) -->
+          <template v-if="canShareMount">
+            <button
+              v-if="isAuthenticated && alistConfigured"
+              class="push-btn primary-glow"
+              :disabled="mounting"
+              @click="executeMountShare">
+              <span v-if="mounting" class="spinner"></span>
+              <span>{{ mounting ? '正在挂载并同步...' : '⚡ 一键挂载到 AList (芝杜秒播)' }}</span>
+            </button>
+            <button class="push-btn secondary-btn" @click="copyAndOpenShare">
+              <span>🌐 打开网盘分享页 (带提取码)</span>
+            </button>
+            <button
+              v-if="isAuthenticated && alistConfigured"
+              class="push-btn refresh-btn"
+              :disabled="refreshing"
+              @click="triggerManualRefresh">
+              <span v-if="refreshing" class="spinner"></span>
+              <span>{{ refreshing ? '穿透刷新中...' : `🔄 转存后穿透刷新 AList${resolvedAlistPath ? ` [${resolvedAlistPath}]` : ''}` }}</span>
+            </button>
+          </template>
 
-          <button
-            v-if="!canShareMount && isAuthenticated && alistConfigured"
-            class="push-btn refresh-btn"
-            :disabled="refreshing"
-            @click="triggerManualRefresh">
-            <span v-if="refreshing" class="spinner"></span>
-            <span>{{ refreshing ? '穿透刷新中...' : '🔄 存入后穿透刷新 AList' }}</span>
-          </button>
-
-          <button class="push-btn secondary-btn" @click="copyAndOpenShare">
-            <span>🌐 打开网盘分享页 (带提取码)</span>
-          </button>
+          <!-- 方案 B 操作群 (需转存个人盘后穿透刷新) -->
+          <template v-else>
+            <button class="push-btn secondary-btn step-btn" @click="copyAndOpenShare">
+              <span>🌐 ① 打开网盘转存 (带提取码)</span>
+            </button>
+            <button
+              v-if="isAuthenticated && alistConfigured"
+              class="push-btn refresh-btn step-btn"
+              :disabled="refreshing"
+              @click="triggerManualRefresh">
+              <span v-if="refreshing" class="spinner"></span>
+              <span>{{ refreshing ? '穿透刷新中...' : `🔄 ② 存入后穿透刷新 AList${resolvedAlistPath ? ` [${resolvedAlistPath}]` : ''}` }}</span>
+            </button>
+          </template>
         </template>
 
         <!-- 磁力类资源操作按钮 -->
@@ -241,6 +284,7 @@
 import { ref, reactive, computed, watch } from "vue";
 import { parseResourceMeta } from "~/composables/useResourceParser";
 import { useAuth } from "~/composables/useAuth";
+import { resolveNetdiskMountPath } from "~/utils/storageResolver";
 
 const props = defineProps<{
   visible: boolean;
@@ -259,6 +303,7 @@ const mountSuccessResult = ref<any>(null);
 
 const alistConfigured = ref(false);
 const userDefaultPath = ref("");
+const userStorages = ref<any[]>([]);
 
 const form = reactive({
   category: "movie" as "movie" | "tv" | "anime" | "other",
@@ -278,8 +323,27 @@ const canShareMount = computed(() => {
   return /115\.com\/s|pan\.baidu\.com\/s|alipan\.com\/s|aliyundrive\.com\/s|123pan\.com\/s/i.test(u);
 });
 
+const resolvedNetdiskInfo = computed(() => {
+  const url = props.item?.url || "";
+  return resolveNetdiskMountPath(url, userStorages.value);
+});
+
+const detectedNetdiskName = computed(() => {
+  return resolvedNetdiskInfo.value?.rule?.name || "网盘资源";
+});
+
+const resolvedAlistPath = computed(() => {
+  if (resolvedNetdiskInfo.value?.matched) {
+    return resolvedNetdiskInfo.value.targetPath;
+  }
+  return "";
+});
+
 const targetMountPathPreview = computed(() => {
-  const base = userDefaultPath.value || `/${user.value?.username || "twisper"}/影视挂载`;
+  let base = userDefaultPath.value;
+  if (!base || base === "/我的影视挂载" || base === "/我的网盘/电影") {
+    base = resolvedAlistPath.value || "/NAS本地盘";
+  }
   const rawTitle = (props.item?.note || props.item?.url || "未知影视")
     .replace(/[\\/:*?"<>|]/g, "_")
     .trim();
@@ -299,6 +363,7 @@ const inferredMediaType = computed(() => {
 async function checkUserProfile() {
   if (!isAuthenticated.value) {
     alistConfigured.value = false;
+    userStorages.value = [];
     return;
   }
   try {
@@ -306,14 +371,73 @@ async function checkUserProfile() {
     if (res.profile && res.profile.alistUrl) {
       alistConfigured.value = true;
       userDefaultPath.value =
-        res.profile.alistDefaultPath || `/${user.value?.username || "twisper"}/影视挂载`;
+        res.profile.alistDefaultPath && res.profile.alistDefaultPath !== "/我的影视挂载" && res.profile.alistDefaultPath !== "/我的网盘/电影"
+          ? res.profile.alistDefaultPath
+          : "/NAS本地盘";
+
+      // 异步抓取当前 AList 已挂载存储列表，用于精准解析目录
+      $fetch<{ success: boolean; storages: any[] }>("/api/nas/storages")
+        .then((sRes) => {
+          if (sRes.success && sRes.storages) {
+            userStorages.value = sRes.storages;
+            if (isCloud.value) {
+              updateTargetDir();
+            }
+          }
+        })
+        .catch(() => {});
     } else {
       alistConfigured.value = false;
+      userStorages.value = [];
     }
   } catch {
     alistConfigured.value = false;
+    userStorages.value = [];
   }
 }
+
+function computeSmartTargetDir(category: "movie" | "tv" | "anime" | "other"): string {
+  const sub = category === "movie" ? "电影" : category === "tv" ? "电视剧" : category === "anime" ? "动漫" : "其他";
+  const enSub = category === "movie" ? "Movies" : category === "tv" ? "TV" : category === "anime" ? "Anime" : "Downloads";
+
+  if (isCloud.value) {
+    // 优先使用当前资源在 AList 中实机匹配到的挂载点
+    let cloudRoot = "";
+    if (
+      resolvedNetdiskInfo.value?.matched &&
+      (resolvedNetdiskInfo.value.strategy === "driver_match" ||
+        resolvedNetdiskInfo.value.strategy === "keyword_match")
+    ) {
+      cloudRoot = resolvedNetdiskInfo.value.targetPath;
+    }
+    if (!cloudRoot) {
+      cloudRoot =
+        userDefaultPath.value &&
+        userDefaultPath.value !== "/我的影视挂载" &&
+        userDefaultPath.value !== "/我的网盘/电影"
+          ? userDefaultPath.value
+          : "/NAS本地盘";
+    }
+    if (cloudRoot && cloudRoot !== "/") {
+      return `${cloudRoot.replace(/\/+$/, "")}/${sub}`;
+    }
+    return `/${sub}`;
+  }
+  return `/Media/${enSub}`;
+}
+
+function updateTargetDir() {
+  form.targetDir = computeSmartTargetDir(form.category);
+}
+
+watch(
+  () => resolvedAlistPath.value,
+  () => {
+    if (isCloud.value) {
+      updateTargetDir();
+    }
+  }
+);
 
 watch(
   () => props.visible,
@@ -338,33 +462,23 @@ watch(
 
     if (meta.mediaType === "tv" || /第[0-9一二三四五六七八九十]+季|[sS][0-9]{1,2}|集全|连载/i.test(text)) {
       form.category = "tv";
-      form.targetDir = isCloud.value ? "/我的网盘/电视剧" : "/Media/TV";
     } else if (meta.mediaType === "anime" || /番剧|新番|动漫|动画/i.test(text)) {
       form.category = "anime";
-      form.targetDir = isCloud.value ? "/我的网盘/动漫" : "/Media/Anime";
     } else {
       form.category = "movie";
-      form.targetDir = isCloud.value ? "/我的网盘/电影" : "/Media/Movies";
     }
+    updateTargetDir();
   },
   { immediate: true }
 );
 
 function setCategory(cat: "movie" | "tv" | "anime" | "other") {
   form.category = cat;
-  if (cat === "movie") {
-    form.targetDir = isCloud.value ? "/我的网盘/电影" : "/Media/Movies";
-  } else if (cat === "tv") {
-    form.targetDir = isCloud.value ? "/我的网盘/电视剧" : "/Media/TV";
-  } else if (cat === "anime") {
-    form.targetDir = isCloud.value ? "/我的网盘/动漫" : "/Media/Anime";
-  } else {
-    form.targetDir = isCloud.value ? "/我的网盘/其他" : "/Media/Downloads";
-  }
+  updateTargetDir();
 }
 
 function resetDefaultPath() {
-  setCategory(form.category);
+  updateTargetDir();
 }
 
 function openNasSettings() {
@@ -426,9 +540,10 @@ async function executeMountShare() {
       message: `🎉 已成功动态挂载至 AList：${res.mountPath}，芝杜海报墙与播放器即刻秒播！`,
     };
   } catch (err: any) {
+    const rawMsg = err.data?.message || err.message || "AList 动态挂载失败";
     feedback.value = {
       success: false,
-      message: err.data?.message || err.message || "AList 挂载失败，请检查 AList 账号权限或分享状态",
+      message: `${rawMsg}。该分享可能受官方防盗链限制或需网盘Cookie，建议点击下方【打开网盘分享页/转存】存入个人盘后点击【转存后穿透刷新 AList】！`,
     };
   } finally {
     mounting.value = false;
@@ -476,26 +591,28 @@ async function triggerManualRefresh() {
   refreshing.value = true;
   feedback.value = null;
 
-  let path = "/";
-  const u = (props.item?.url || "").toLowerCase();
-  if (u.includes("quark.cn")) path = "/夸克";
-  else if (u.includes("115.com")) path = "/115网盘";
-  else if (u.includes("baidu.com")) path = "/百度网盘";
-  else if (u.includes("xunlei.com")) path = "/迅雷网盘";
+  const targetPath = resolvedAlistPath.value || "/";
 
   try {
     const res = await $fetch<any>("/api/nas/refresh", {
       method: "POST",
-      body: { path },
+      body: {
+        path: targetPath,
+        url: props.item?.url || "",
+      },
     });
     feedback.value = {
       success: true,
-      message: `✅ AList 目录 [${path}] 缓存已成功穿透刷新，芝杜海报墙已同步最新文件！`,
+      message: res.message || `✅ AList 目录 [${res.path || targetPath}] 缓存已成功穿透刷新，芝杜海报墙已同步最新文件！`,
     };
   } catch (e: any) {
+    let msg = e.data?.message || e.message || "刷新 AList 目录失败，请检查 AList 状态";
+    if (typeof msg === "string" && (msg.includes("storage not found") || msg.includes("rawPath"))) {
+      msg = `未在您的 AList 中检测到对应网盘的挂载点 [${targetPath}]。请确认已在 AList 后台完成该网盘的挂载。`;
+    }
     feedback.value = {
       success: false,
-      message: e.data?.message || "刷新 AList 目录失败，请检查 AList 状态",
+      message: msg,
     };
   } finally {
     refreshing.value = false;
@@ -869,6 +986,34 @@ async function executePush() {
   background: rgba(16, 185, 129, 0.2);
   color: #6ee7b7;
   font-weight: 500;
+}
+
+.transfer-card {
+  background: rgba(56, 189, 248, 0.06);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.transfer-badge {
+  color: #38bdf8;
+}
+
+.transfer-tag {
+  background: rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+}
+
+.target-storage-tag {
+  margin-left: 8px;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.step-btn {
+  font-size: 12px;
 }
 
 .z9x-steps {

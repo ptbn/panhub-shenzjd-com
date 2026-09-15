@@ -14,6 +14,16 @@ export default defineEventHandler(async (event) => {
     };
   }
 
+  let alistDefaultPath = profile.alistDefaultPath;
+  if (
+    !alistDefaultPath ||
+    alistDefaultPath === "/我的网盘/电影" ||
+    alistDefaultPath === "/我的影视挂载" ||
+    alistDefaultPath.startsWith("/我的网盘")
+  ) {
+    alistDefaultPath = "/NAS本地盘";
+  }
+
   const publicProfile: NasProfilePublic = {
     id: profile.id,
     userId: profile.userId,
@@ -22,7 +32,7 @@ export default defineEventHandler(async (event) => {
     cloudDriveEnabled: Boolean(profile.cloudDriveEnabled),
     alistUrl: profile.alistUrl,
     alistHasToken: Boolean(profile.alistTokenEncrypted),
-    alistDefaultPath: profile.alistDefaultPath,
+    alistDefaultPath,
     torrentClientType: profile.torrentClientType,
     torrentClientUrl: profile.torrentClientUrl,
     torrentHasSecret: Boolean(profile.torrentClientSecretEncrypted),

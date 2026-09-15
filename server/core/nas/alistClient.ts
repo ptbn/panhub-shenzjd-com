@@ -34,6 +34,7 @@ export async function testAListConnection(
 
   try {
     const headers: Record<string, string> = {
+      "User-Agent": "PanHub-NAS-Client/2.0",
       Accept: "application/json",
     };
     if (token) {
@@ -96,6 +97,7 @@ export async function addAListOfflineDownload(
 
   try {
     const headers: Record<string, string> = {
+      "User-Agent": "PanHub-NAS-Client/2.0",
       "Content-Type": "application/json",
       Accept: "application/json",
     };
@@ -185,6 +187,7 @@ export async function getAListStorages(
 
   try {
     const headers: Record<string, string> = {
+      "User-Agent": "PanHub-NAS-Client/2.0",
       Accept: "application/json",
     };
     if (token) {
@@ -257,6 +260,7 @@ export async function refreshAListPath(
 
   try {
     const headers: Record<string, string> = {
+      "User-Agent": "PanHub-NAS-Client/2.0",
       "Content-Type": "application/json",
       Accept: "application/json",
     };
@@ -292,9 +296,13 @@ export async function refreshAListPath(
         total: json.data?.total || 0,
       };
     } else {
+      let friendlyMsg = json.message || `刷新失败 (code: ${json.code})`;
+      if (typeof json.message === "string" && json.message.includes("storage not found")) {
+        friendlyMsg = `未在 AList 中检测到挂载目录 [${cleanPath}]，请确认该网盘驱动已在 AList 中添加挂载`;
+      }
       return {
         success: false,
-        message: json.message || `刷新失败 (code: ${json.code})`,
+        message: friendlyMsg,
       };
     }
   } catch (e: any) {
