@@ -325,14 +325,12 @@ useSeoMeta({
     "聚合阿里云盘、夸克、百度网盘、115、迅雷等平台，实时检索各类分享链接与资源，快速、高效。",
   ogType: "website",
   ogSiteName: "PanHub",
-  ogImage:
-    "https://cdn.jsdmirror.com/gh/wu529778790/img.shenzjd.com@master/blog/imgx-20260828-151509-5bk7.svg",
+  ogImage: "/favicon.svg",
   twitterCard: "summary_large_image",
   twitterTitle: "PanHub - 全网最全的网盘搜索",
   twitterDescription:
     "聚合阿里云盘、夸克、百度网盘、115、迅雷等平台，实时检索各类分享链接与资源，快速、高效。",
-  twitterImage:
-    "https://cdn.jsdmirror.com/gh/wu529778790/img.shenzjd.com@master/blog/imgx-20260828-151509-5bk7.svg",
+  twitterImage: "/favicon.svg",
 });
 
 useHead({
