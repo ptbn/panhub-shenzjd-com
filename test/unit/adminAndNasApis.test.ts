@@ -170,17 +170,17 @@ describe("Admin & NAS Profile 业务层综合测试", () => {
     expect(allUsers.some((u) => u.email === "direct@taogehome.cloud")).toBe(true);
   });
 
-  it("家庭/系统默认 NAS 配置自动降级兜底与专属配置覆盖机制", async () => {
-    // 1. 管理员创建并配置系统默认 NAS (isDefault = 1)
+  it("多租户 NAS 配置严格账号隔离测试 (无专属配置时绝不越权降级)", async () => {
+    // 1. 管理员创建并配置管理员自己的 NAS (isDefault = 1)
     const admin = await registerUser(
       { email: "owner@taogehome.cloud", username: "HouseOwner", password: "Password123" },
       db
     );
-    const encToken = await encryptCredential("alist-family-shared-token", masterSecret);
+    const encToken = await encryptCredential("alist-admin-private-token", masterSecret);
     await db.upsertNasProfile({
-      id: "nas_default_1",
+      id: "nas_admin_1",
       userId: admin.user.id,
-      name: "绿联 DX4600 家庭共享",
+      name: "管理员专属绿联 DX4600",
       isDefault: 1,
       cloudDriveEnabled: 1,
       alistUrl: "https://alist.taogehome.cloud",
@@ -199,14 +199,11 @@ describe("Admin & NAS Profile 业务层综合测试", () => {
       db
     );
 
-    // 3. 验证新成员通过 getNasProfile 能够无缝继承系统默认配置，绝不报“未配置”
-    const fallbackProfile = await db.getNasProfile(member.user.id);
-    expect(fallbackProfile).not.toBeNull();
-    expect(fallbackProfile?.name).toBe("绿联 DX4600 家庭共享");
-    expect(fallbackProfile?.alistUrl).toBe("https://alist.taogehome.cloud");
-    expect(fallbackProfile?.torrentDefaultDir).toBe("/volume2/影音资源");
+    // 3. 验证新成员通过 getNasProfile 绝不越权读取管理员的 NAS 配置，严格返回 null
+    const unconfiguredProfile = await db.getNasProfile(member.user.id);
+    expect(unconfiguredProfile).toBeNull();
 
-    // 4. 新成员在设置中自定义了自己的专属 NAS 目录
+    // 4. 新成员在设置中自定义配置了自己的专属 NAS
     const memberToken = await encryptCredential("member-private-token", masterSecret);
     await db.upsertNasProfile({
       id: "nas_member_1",
@@ -223,13 +220,13 @@ describe("Admin & NAS Profile 业务层综合测试", () => {
       torrentDefaultDir: "/downloads/member",
     });
 
-    // 5. 验证新成员读取到自己的专属配置，而管理员仍然读取自己的默认配置
+    // 5. 验证新成员读取到自己的专属配置，而管理员仍然读取自己的专属配置，互不串扰
     const memberProfile = await db.getNasProfile(member.user.id);
     expect(memberProfile?.name).toBe("小明的极空间 NAS");
     expect(memberProfile?.alistUrl).toBe("https://alist-member.taogehome.cloud");
 
     const adminProfile = await db.getNasProfile(admin.user.id);
-    expect(adminProfile?.name).toBe("绿联 DX4600 家庭共享");
+    expect(adminProfile?.name).toBe("管理员专属绿联 DX4600");
     expect(adminProfile?.alistUrl).toBe("https://alist.taogehome.cloud");
   });
 });

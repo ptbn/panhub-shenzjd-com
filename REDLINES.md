@@ -8,5 +8,5 @@
 6. **NAS 与 AList 动态路径与能力严格对齐**：网盘挂载必须按驱动特性区分动态挂载与转存同步，路径须结合实机存储列表动态推导，严禁静态硬编码子路径或裸露底层堆栈。
 7. **qBittorrent 状态监控作为单一事实来源 (SSOT)**：BT/磁力离线任务的即时进度、做种数、上下行速率与控制指令必须直连 qBittorrent Web API，严禁依赖 AList 的 `undone/done` 接口作为监控面板数据源（防止因 qB v5.x 契约漂移导致的误报与指标缺失）。
 8. **NAS 离线下载临时路径与目标路径必须同卷物理对齐**：AList 调度 qBittorrent 离线下载时，临时目录（`temp_dir`）必须与落地存储挂载在同一物理卷（如 `/volume2/影音资源`），并通过容器内软链接统一路径命名，保证下载完成后的转存为底层文件系统 inode 重命名的“零拷贝原子瞬移”，杜绝跨卷复制阻塞。
-9. **Cloudflare D1 物理绑定与默认配置兜底**：`wrangler.toml` 必须显式声明 D1 `[[d1_databases]]` 物理绑定（`panhub-db`，ID: `7299e484-6c0f-4719-94a1-bb59d8a9a0dd`）；后端检索配置必须支持全局默认配置（`is_default = 1`）降级兜底；前端必须在用户登录与会话恢复时主动从 D1 回水，彻底杜绝冷重启配置丢失。
+9. **Cloudflare D1 物理绑定与 SaaS 多租户严格隔离**：`wrangler.toml` 必须显式声明 D1 `[[d1_databases]]` 物理绑定（`panhub-db`，ID: `7299e484-6c0f-4719-94a1-bb59d8a9a0dd`）；NAS 与 AList 配置强制执行 SaaS 级账号绝对隔离，严禁无专属配置的用户越权降级窃用管理员或其他用户的私有节点；前端必须在用户登录与会话恢复时主动从 D1 回水，彻底杜绝冷重启配置丢失。
 10. **边缘部署预设严禁裸跑 node-server**：发布 Cloudflare 边缘前必须使用 `$env:NITRO_PRESET="cloudflare_module"; npx nuxt build` 构建打包，确保 ESM 依赖自包含闭包，严禁直接发布导致 runtime module 缺失。

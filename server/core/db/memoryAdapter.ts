@@ -251,16 +251,7 @@ export class MemoryDatabaseAdapter implements DatabaseAdapter {
 
   // NAS Profiles
   async getNasProfile(userId: string): Promise<NasProfileRecord | null> {
-    let profile = this.nasProfiles.get(userId);
-    if (!profile) {
-      // 降级兜底：家庭私有化环境，若该用户尚未单独配置，无缝回退至系统全局默认配置 (is_default = 1)
-      for (const p of this.nasProfiles.values()) {
-        if (p.isDefault === 1) {
-          profile = p;
-          break;
-        }
-      }
-    }
+    const profile = this.nasProfiles.get(userId);
     return profile ? { ...profile } : null;
   }
 

@@ -283,17 +283,10 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
   // NAS Profiles
   async getNasProfile(userId: string): Promise<NasProfileRecord | null> {
-    let row = await this.db
+    const row = await this.db
       .prepare("SELECT * FROM nas_profiles WHERE user_id = ?")
       .bind(userId)
       .first<any>();
-
-    // 降级兜底：私有化与家庭场景下，若该账号尚未单独配置，无缝回退至系统全局默认配置 (is_default = 1)
-    if (!row) {
-      row = await this.db
-        .prepare("SELECT * FROM nas_profiles WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1")
-        .first<any>();
-    }
 
     if (!row) return null;
     return this.mapNasProfile(row);

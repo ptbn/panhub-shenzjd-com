@@ -128,6 +128,7 @@ export async function addQBittorrentTorrent(
 
     const headers: Record<string, string> = {
       "Content-Type": "application/x-www-form-urlencoded",
+      Referer: cleanUrl,
     };
     if (cookieHeader) headers["Cookie"] = cookieHeader;
 
