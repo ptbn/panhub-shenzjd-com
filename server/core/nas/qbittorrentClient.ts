@@ -2,6 +2,7 @@
 // qBittorrent 官方 WebAPI 驱动客户端 (纯 JS/TS，兼容 CF Workers)
 
 import { validateNasTargetUrl } from "./ssrfGuard";
+import { enhanceMagnetUrlWithTrackers } from "./trackerInjector";
 
 export interface QBittorrentTestResult {
   success: boolean;
@@ -122,7 +123,8 @@ export async function addQBittorrentTorrent(
     }
 
     const params = new URLSearchParams();
-    params.append("urls", urls.join("\n"));
+    const enhancedUrls = urls.map((u) => enhanceMagnetUrlWithTrackers(u));
+    params.append("urls", enhancedUrls.join("\n"));
     if (savepath) params.append("savepath", savepath);
     if (category) params.append("category", category);
 
