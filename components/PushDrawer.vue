@@ -354,10 +354,12 @@ const props = defineProps<{
   item: any;
 }>();
 const emit = defineEmits(["close", "success"]);
-
 const { user, isAuthenticated } = useAuth();
 const { loadProfile: fetchNasProfile, getLocalProfile, getAuthHeaders } = useNasProfile();
+
 const nasModalVisible = useState<boolean>("nas_modal_visible", () => false);
+const nasTasksDrawerVisible = useState<boolean>("nas_tasks_drawer_visible", () => false);
+
 
 const pushing = ref(false);
 const mounting = ref(false);
@@ -771,7 +773,11 @@ async function executePush() {
     setTimeout(() => {
       emit("success");
       emit("close");
-    }, 2000);
+      if (!isCloud.value) {
+        nasTasksDrawerVisible.value = true;
+      }
+    }, 1500);
+
   } catch (err: any) {
     feedback.value = {
       success: false,

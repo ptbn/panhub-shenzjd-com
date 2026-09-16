@@ -90,6 +90,19 @@
           <div v-if="user" class="user-nav-group">
             <button
               type="button"
+              class="nav-pill-btn tasks-btn"
+              @click="nasTasksDrawerVisible = true"
+              title="查看 NAS 实时下载任务与落盘状态 (qBittorrent)">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>下载任务</span>
+            </button>
+
+            <button
+              type="button"
               class="nav-pill-btn nas-btn"
               @click="nasModalVisible = true"
               title="配置我的 NAS (AList / Aria2 / 绿联云影院)">
@@ -216,6 +229,8 @@
     </footer>
     <!-- 全局 NAS 设置弹窗 -->
     <NasSettingsModal :visible="nasModalVisible" @close="nasModalVisible = false" />
+    <!-- 全局 NAS 实时下载监控抽屉 -->
+    <NasTasksDrawer :visible="nasTasksDrawerVisible" @close="nasTasksDrawerVisible = false" />
   </div>
 </template>
 
@@ -223,6 +238,7 @@
 import { ref } from "vue";
 import BackToTop from "../components/BackToTop.vue";
 import NasSettingsModal from "../components/NasSettingsModal.vue";
+import NasTasksDrawer from "../components/NasTasksDrawer.vue";
 
 const { loadSettings } = useSettings();
 const { isDark, toggle: toggleTheme } = useDarkMode();
@@ -232,6 +248,7 @@ const { loadProfile } = useNasProfile();
 const currentNav = ref("home");
 const mobileMenuOpen = ref(false);
 const nasModalVisible = useState<boolean>("nas_modal_visible", () => false);
+const nasTasksDrawerVisible = useState<boolean>("nas_tasks_drawer_visible", () => false);
 const userMenuOpen = ref(false);
 
 async function handleLogout() {
@@ -471,6 +488,17 @@ onMounted(() => {
   border-color: rgba(16, 185, 129, 0.3);
   color: #34d399;
 }
+
+.tasks-btn {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+.tasks-btn:hover {
+  background: rgba(59, 130, 246, 0.22);
+}
+
 
 .nas-btn:hover {
   background: rgba(16, 185, 129, 0.22);
