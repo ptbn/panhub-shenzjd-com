@@ -1,0 +1,17 @@
+# ==============================================================================
+# Cloudflare Tunnel 穿透配置片段 (仅需追加至您的 cloudflared config.yml)
+# 将 prowlarr.taogehome.cloud 零端口暴露映射至 NAS 本地 Prowlarr
+# ==============================================================================
+
+ingress:
+  # 新增 Prowlarr 聚合雷达子域名
+  - hostname: prowlarr.taogehome.cloud
+    service: http://localhost:9696
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 10s
+
+  # 已有的其他服务保持不变（如 alist.taogehome.cloud）
+  # - hostname: alist.taogehome.cloud
+  #   service: http://localhost:45199
+  # ...

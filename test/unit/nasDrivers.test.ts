@@ -508,5 +508,61 @@ describe("NAS Drivers & SSRF Security 模块测试", () => {
       expect(logs[0].title).toBe("肖申克的救赎 4K Remux");
       expect(logs[0].protocol).toBe("qbittorrent");
     });
+
+    it("方案 A 原厂直通：当用户配置了 qB 客户端地址时，磁力任务直接调用 addQBittorrentTorrent 投递，绝不经过 AList", async () => {
+      const profile: NasProfileRecord = {
+        id: "p3",
+        userId: "u3",
+        name: "绿联 DX4600 (方案 A 架构解耦)",
+        isDefault: 1,
+        cloudDriveEnabled: 1,
+        alistUrl: "https://alist.taogehome.cloud",
+        alistTokenEncrypted: "",
+        alistDefaultPath: "/NAS本地盘",
+        torrentClientType: "qbittorrent",
+        torrentClientUrl: "https://qb.taogehome.cloud", // 方案 A 显式配置了独立 qB 域名
+        torrentClientSecretEncrypted: "",
+        torrentDefaultDir: "/downloads",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      // Mock qBittorrent /api/v2/torrents/add 响应 (HTTP 200)
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("Ok.", {
+          status: 200,
+          headers: { "Content-Type": "text/plain" },
+        })
+      );
+
+      const pushRes = await dispatchPushTask(
+        profile,
+        {
+          title: "奥本海默 4K IMAX 原盘",
+          url: "magnet:?xt=urn:btih:dc36bc7e6dd458a4298651450d35737256632dbd",
+          category: "movie",
+          preferredClient: "qbittorrent",
+        },
+        masterSecret,
+        db,
+        "涛哥"
+      );
+
+      expect(pushRes.success).toBe(true);
+      expect(pushRes.protocol).toBe("qbittorrent");
+      expect(pushRes.targetPath).toBe("/downloads/电影");
+
+      // 验证调用的接口必须是 qBittorrent 原生 Web API，绝不经过 AList
+      expect(fetchSpy).toHaveBeenCalled();
+      const lastCall = fetchSpy.mock.calls[0];
+      expect(lastCall[0]).toBe("https://qb.taogehome.cloud/api/v2/torrents/add");
+      expect(lastCall[0]).not.toContain("alist.taogehome.cloud");
+
+      // 验证审计日志
+      const logs = await db.listPushLogsByUser("u3");
+      expect(logs).toHaveLength(1);
+      expect(logs[0].title).toBe("奥本海默 4K IMAX 原盘");
+      expect(logs[0].protocol).toBe("qbittorrent");
+    });
   });
 });

@@ -212,7 +212,8 @@ export async function getQBittorrentTorrents(
 
     const headers: Record<string, string> = {
       Accept: "application/json",
-      "User-Agent": "PanHub-NAS-Client/2.0",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Referer: cleanUrl,
     };
     if (cookieHeader) headers["Cookie"] = cookieHeader;
 
@@ -285,7 +286,8 @@ export async function controlQBittorrentTorrents(
 
     const headers: Record<string, string> = {
       "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": "PanHub-NAS-Client/2.0",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Referer: cleanUrl,
     };
     if (cookieHeader) headers["Cookie"] = cookieHeader;
 

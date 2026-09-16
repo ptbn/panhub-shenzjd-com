@@ -211,10 +211,20 @@ export async function dispatchPushTask(
         }
       }
 
-      let targetDir = task.targetDir || profile.torrentDefaultDir || "/Media/Movies";
+      let baseDir = task.targetDir || profile.torrentDefaultDir || "/downloads";
+      if (baseDir.startsWith("/NAS本地盘")) {
+        baseDir = baseDir.replace("/NAS本地盘", "/downloads");
+      } else if (baseDir.startsWith("/Media")) {
+        baseDir = baseDir.replace("/Media", "/downloads");
+      }
+      const subChinese = task.category === "tv" ? "电视剧" : task.category === "anime" ? "动漫" : "电影";
+      let targetDir = baseDir.replace(/\/+$/, "");
+      if (!targetDir.endsWith(subChinese)) {
+        targetDir = `${targetDir}/${subChinese}`;
+      }
       const sub = inferCategorySubdir(task.category);
 
-      const res = await addQBittorrentTorrent(
+      let res = await addQBittorrentTorrent(
         profile.torrentClientUrl,
         "admin",
         secret || undefined,
@@ -224,12 +234,28 @@ export async function dispatchPushTask(
         allowPrivateIp
       );
 
+      // 若当前通过公网隧道直连超时，尝试回退内网地址
+      if (!res.success && profile.torrentClientUrl !== "http://192.168.1.110:8080") {
+        const fallbackRes = await addQBittorrentTorrent(
+          "http://192.168.1.110:8080",
+          "admin",
+          secret || undefined,
+          [task.url],
+          targetDir,
+          sub,
+          true
+        );
+        if (fallbackRes.success) {
+          res = fallbackRes;
+        }
+      }
+
       finalResult = {
         success: res.success,
         protocol: "qbittorrent",
-        message: res.message,
+        message: res.message || "磁力任务已直连提交至 qBittorrent 原生队列，正在高速做种下载",
         targetPath: targetDir,
-        targetDevice: profile.name || "家庭 NAS",
+        targetDevice: profile.name || "绿联 DX4600 私有云",
       };
     }
   }

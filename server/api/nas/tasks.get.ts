@@ -39,11 +39,13 @@ function mapStateText(state: string): { text: string; badgeType: "primary" | "wa
     case "checkingUP":
       return { text: "数据校验中", badgeType: "warning" };
     case "pausedDL":
+    case "stoppedDL":
       return { text: "已暂停", badgeType: "neutral" };
     case "uploading":
       return { text: "已落盘·做种中", badgeType: "success" };
     case "stalledUP":
     case "pausedUP":
+    case "stoppedUP":
       return { text: "已完成落盘", badgeType: "success" };
     case "error":
     case "missingFiles":

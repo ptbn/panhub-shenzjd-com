@@ -1,0 +1,40 @@
+# ==============================================================================
+# 涛哥家庭智能中枢 · Prowlarr 影视索引雷达 (绿联 DX4600 专用声明式编排)
+# 架构隔离红线：
+# 1. 严格绑定 9696 独立端口，绝不侵犯 AList(45199)、qBittorrent、HA(8123)
+# 2. 独立挂载 /volume1/docker/prowlarr/config，绝不触碰影视媒体库与下载卷
+# 3. 严格内存限额 512MB，OOM 保护宿主机稳定
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    ports:
+      - "9696:9696"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Shanghai
+    volumes:
+      # 绿联 DX4600 独立配置存储卷（请确保在绿联云文件管理中提前创建该文件夹）
+      - /volume1/docker/prowlarr/config:/config
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
